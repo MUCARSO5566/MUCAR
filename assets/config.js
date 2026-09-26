@@ -13,7 +13,7 @@ window.CARWASH_CONFIG = {
   API_URL: 'https://script.google.com/macros/s/AKfycbyaAwZK19VEdhTFm0P6k14FxQwuPFX1Kw5Yd3ccaTzqlS6E3NsGEvGyuBR2PQq1mOfy/exec',
 
   /* 前台公開金鑰，要跟 Code.gs 的 PUBLIC_KEY 一致（純防呆，不是真正密碼） */
-  PUBLIC_KEY: 'qazb5566',
+  PUBLIC_KEY: 'qazb55665566',
 
   /* 店名 */
   SHOP_NAME: '沐車所｜MUCAR',

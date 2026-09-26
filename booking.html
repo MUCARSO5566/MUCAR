@@ -23,7 +23,7 @@
 
   <ol class="stepper" id="stepper">
     <li data-n="1" class="active">基本資料</li>
-    <li data-n="2">選擇車型</li>
+    <li data-n="2">選擇車種</li>
     <li data-n="3">地址時段</li>
     <li data-n="4">付款方式</li>
     <li data-n="5">確認送出</li>
@@ -67,28 +67,31 @@
 
   <!-- Step 2 -->
   <section id="step2" class="panel" hidden>
-    <h2>選擇車型</h2>
-    <p class="desc">系統會依車型自動判定級距與價格。</p>
+    <h2>選擇車種</h2>
+    <p class="desc">選好車種後，系統會自動帶入車型與價格。</p>
 
-    <div id="vehLoading" class="hint">載入車型資料中…</div>
+    <div id="vehLoading" class="hint">載入車種資料中…</div>
     <div id="vehFail" class="alert alert-danger" hidden>
-      <div id="vehFailMsg">無法載入車型資料。</div>
+      <div id="vehFailMsg">無法載入車種資料。</div>
       <button class="btn btn-secondary btn-sm" id="vehRetry" type="button">重新載入</button>
     </div>
 
     <div id="vehForm" hidden>
       <div class="field">
-        <label for="fBrand">廠牌<span class="req">*</span></label>
-        <select id="fBrand"></select>
+        <label for="fVehicle">車種<span class="req">*</span></label>
+        <select id="fVehicle"></select>
+        <div class="hint">依廠牌分類，可直接輸入文字快速找到；找不到請選最下方「找不到我的車 / 其他」。</div>
       </div>
-      <div class="field" id="modelField">
-        <label for="fModel">車型<span class="req">*</span></label>
-        <select id="fModel" disabled><option value="">請先選擇廠牌</option></select>
-      </div>
+
       <div class="field" id="otherField" hidden>
         <label for="fOther">您的車款<span class="req">*</span></label>
         <input id="fOther" type="text" maxlength="60" placeholder="例如：Toyota Camry 2021">
-        <div class="hint">找不到沒關係，店家會確認車型與價格後通知您。</div>
+      </div>
+
+      <div class="field">
+        <label for="fTier">車型<span class="req">*</span></label>
+        <select id="fTier" disabled><option value="">選擇車種後自動帶入</option></select>
+        <div class="hint" id="tierHint">車型由系統依車種自動判定，無法自行更改。</div>
       </div>
 
       <div class="price-preview" id="pricePreview" hidden>
@@ -106,11 +109,20 @@
     <h2>牽車地址與預約時段</h2>
     <p class="desc">專員會到您指定的地點牽車，完工後送回原處。</p>
 
-    <div class="field">
-      <label for="fAddress">牽車地址<span class="req">*</span></label>
-      <textarea id="fAddress" maxlength="200" placeholder="縣市、路名、門牌，並註明樓層或停車位置"></textarea>
-      <div class="field-err" id="errAddress" hidden></div>
-      <div class="hint">預設原處交車；若要送回其他地點，請寫在上一頁的備註。</div>
+    <div class="addr-grid">
+      <div class="field">
+        <label for="fAddress">牽車地址<span class="req">*</span></label>
+        <textarea id="fAddress" maxlength="200" placeholder="縣市、路名、門牌，並註明樓層或停車位置"></textarea>
+        <div class="field-err" id="errAddress" hidden></div>
+        <div class="hint">請先寫完整地址，樓層或車位寫在後面。右側地圖用來確認位置是否正確。預設原處交車；若要送回其他地點，請寫在上一頁的備註。</div>
+      </div>
+      <div class="map-box">
+        <div class="map-frame">
+          <div class="map-empty" id="mapEmpty">輸入地址後，這裡會顯示地圖位置</div>
+          <iframe id="mapIframe" title="牽車地點地圖" loading="lazy" referrerpolicy="no-referrer-when-downgrade" hidden></iframe>
+        </div>
+        <a id="mapLink" class="hint" href="#" target="_blank" rel="noopener" hidden>在 Google 地圖開啟，確認位置 &rarr;</a>
+      </div>
     </div>
 
     <div class="field">

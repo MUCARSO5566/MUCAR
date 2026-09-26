@@ -22,7 +22,8 @@
 
   function render(o) {
     current = o;
-    var priced = !U.isTrue(o.needsPricing) && o.price !== '' && o.price != null;
+    var hasPrice = o.price !== '' && o.price != null;
+    var priceText = !hasPrice ? '待店家確認' : (U.isTrue(o.needsPricing) ? U.money(o.price) + '（暫估，店家確認車款後為準）' : U.money(o.price));
     var state = U.orderState(o);
     var html =
       '<section class="panel" style="margin-top:16px">' +
@@ -31,8 +32,8 @@
       '<table class="kv">' +
       row('姓名', U.esc(o.customerName)) +
       row('預約時段', U.esc(o.startAt.slice(0, 16)) + ' ～ ' + U.esc(o.endAt.slice(11, 16))) +
-      row('車型', U.esc(o.vehicleBrand + ' ' + o.vehicleModel)) +
-      row('洗車費用', priced ? U.money(o.price) : '待店家確認') +
+      row('車種', U.esc(o.vehicleBrand + ' ' + o.vehicleModel)) +
+      row('洗車費用', U.esc(priceText)) +
       row('牽車地址', U.esc(o.pickupAddress || '—')) +
       row('付款方式', o.paymentMethod === 'transfer' ? '匯款' : '現場付款') +
       (o.note ? row('備註', U.esc(o.note)) : '') +

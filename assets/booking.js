@@ -4,6 +4,7 @@
   var CFG = window.CARWASH_CONFIG;
   var STEP_MIN = Number(CFG.AVAILABILITY_STEP_MIN) || 30;
   var OTHER = '__OTHER__';
+  var ASK = '__ASK__';
   var DAYS_AHEAD = 21;
 
   function $(id) { return document.getElementById(id); }
@@ -11,7 +12,8 @@
   var S = {
     step: 1,
     tiers: [], types: [], loaded: false,
-    vehicle: null,          // 車型物件，或 { id: 'OTHER' }
+    vehicle: null,          // 車種物件，或 { id: 'OTHER' }
+    otherTier: '',          // 「找不到我的車」時客人自選的車型級距 id（空 = 由店家判斷）
     day: '', slot: null, avail: null, availSeq: 0,
     payment: '', order: null
   };
@@ -37,20 +39,34 @@
     if (el) el.setAttribute('aria-invalid', bad ? 'true' : 'false');
   }
 
-  function tierOf(v) {
-    return S.tiers.filter(function (t) { return String(t.id) === String(v.tierId); })[0] || null;
+  function tierById(id) {
+    return S.tiers.filter(function (t) { return String(t.id) === String(id); })[0] || null;
   }
+  function tierOf(v) { return tierById(v.tierId); }
+
+  function isOther() { return !!S.vehicle && S.vehicle.id === 'OTHER'; }
 
   function vehicleText() {
     if (!S.vehicle) return '';
-    if (S.vehicle.id === 'OTHER') return '其他：' + $('fOther').value.trim();
+    if (isOther()) return '其他：' + $('fOther').value.trim();
     return S.vehicle.brand + ' ' + S.vehicle.model;
   }
 
+  /** 目前的車型級距與價格；tentative = 客人自選、店家還要再確認 */
   function priceInfo() {
-    if (!S.vehicle || S.vehicle.id === 'OTHER') return { tier: '待店家確認車型', price: null };
-    var t = tierOf(S.vehicle);
-    return { tier: t ? t.name : '', price: t ? Number(t.price) : null };
+    if (!S.vehicle) return { tier: '', price: null, tentative: false };
+    if (isOther()) {
+      var t = tierById(S.otherTier);
+      return t ? { tier: t.name + '（自選）', price: Number(t.price), tentative: true }
+               : { tier: '由店家判斷', price: null, tentative: false };
+    }
+    var tt = tierOf(S.vehicle);
+    return { tier: tt ? tt.name : '', price: tt ? Number(tt.price) : null, tentative: false };
+  }
+
+  function priceLabel(p) {
+    if (p.price == null) return '待店家確認';
+    return U.money(p.price) + (p.tentative ? '（暫估，店家確認車款後為準）' : '');
   }
 
   function windowHours() { return S.avail ? Number(S.avail.windowHours) : 3; }
@@ -87,6 +103,7 @@
     clearError();
     renderSummary();
     if (n === 3 && !S.day) selectDay(U.serviceToday());
+    if (n === 3) updateMap();
     if (n === 4) prepPayment();
     if (n === 5) renderReview();
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -96,7 +113,7 @@
     var chips = [];
     if (S.step >= 3 && S.vehicle) {
       var p = priceInfo();
-      chips.push('<span class="chip"><b>' + U.esc(vehicleText()) + '</b>' + (p.price != null ? ' · ' + U.money(p.price) : ' · 待確認') + '</span>');
+      chips.push('<span class="chip"><b>' + U.esc(vehicleText()) + '</b> · ' + (p.price != null ? U.money(p.price) + (p.tentative ? '（暫估）' : '') : '待確認') + '</span>');
     }
     if (S.step >= 4 && S.slot) chips.push('<span class="chip"><b>' + U.esc(slotText()) + '</b></span>');
     var box = $('summary');
@@ -118,7 +135,7 @@
     return ok;
   }
 
-  /* ---------------- Step 2：車型 ---------------- */
+  /* ---------------- Step 2：車種 → 自動帶入車型 ---------------- */
 
   function loadVehicles() {
     $('vehLoading').hidden = false;
@@ -134,84 +151,126 @@
     return Api.call('bootBooking', {}).then(function (data) {
       S.tiers = data.tiers || [];
       S.types = (data.vehicleTypes || []).filter(function (v) { return !!tierOf(v); });
-      if (!S.types.length) throw new Error('目前沒有可選的車型，請聯絡店家。');
+      if (!S.types.length) throw new Error('目前沒有可選的車種，請聯絡店家。');
       S.loaded = true;
-      renderBrands();
+      renderVehicles();
       $('vehLoading').hidden = true;
       $('vehForm').hidden = false;
     }).catch(function (err) {
       S.loaded = false;
       $('vehLoading').hidden = true;
-      $('vehFailMsg').textContent = '無法載入車型資料：' + err.message;
+      $('vehFailMsg').textContent = '無法載入車種資料：' + err.message;
       $('vehFail').hidden = false;
     });
   }
 
-  function renderBrands() {
-    var brands = [];
-    S.types.forEach(function (v) { if (brands.indexOf(v.brand) < 0) brands.push(v.brand); });
-    brands.sort(function (a, b) { return a.localeCompare(b, 'en'); });
-    $('fBrand').innerHTML = '<option value="">請選擇廠牌</option>' +
-      brands.map(function (b) { return '<option value="' + U.esc(b) + '">' + U.esc(b) + '</option>'; }).join('') +
-      '<option value="' + OTHER + '">其他 / 找不到我的車</option>';
-    onBrandChange();
+  function renderVehicles() {
+    var byBrand = {};
+    S.types.forEach(function (v) { (byBrand[v.brand] = byBrand[v.brand] || []).push(v); });
+    var brands = Object.keys(byBrand).sort(function (a, b) { return a.localeCompare(b, 'en'); });
+
+    var html = '<option value="">請選擇車種</option>';
+    brands.forEach(function (b) {
+      var list = byBrand[b].sort(function (x, y) { return String(x.model).localeCompare(String(y.model), 'en', { numeric: true }); });
+      html += '<optgroup label="' + U.esc(b) + '">' + list.map(function (v) {
+        return '<option value="' + U.esc(v.id) + '">' + U.esc(v.brand + ' ' + v.model) + '</option>';
+      }).join('') + '</optgroup>';
+    });
+    html += '<option value="' + OTHER + '">找不到我的車 / 其他</option>';
+    $('fVehicle').innerHTML = html;
+    onVehicleChange();
   }
 
-  function onBrandChange() {
-    var brand = $('fBrand').value;
-    S.vehicle = null;
-    $('pricePreview').hidden = true;
-    $('otherField').hidden = (brand !== OTHER);
-    $('modelField').hidden = (brand === OTHER);
+  /** 車型（級距）欄位：一般情況自動帶入且不能改；只有「找不到我的車」才開放自行選擇 */
+  function setTierAuto(tier) {
+    var sel = $('fTier');
+    sel.disabled = true;
+    sel.innerHTML = tier
+      ? '<option value="' + U.esc(tier.id) + '">' + U.esc(tier.name) + '</option>'
+      : '<option value="">選擇車種後自動帶入</option>';
+    $('tierHint').textContent = '車型由系統依車種自動判定，無法自行更改。';
+  }
 
-    if (brand === OTHER) {
-      S.vehicle = { id: 'OTHER' };
-      showPreview();
-      return;
-    }
-    var sel = $('fModel');
-    if (!brand) {
-      sel.disabled = true;
-      sel.innerHTML = '<option value="">請先選擇廠牌</option>';
-      return;
-    }
-    var models = S.types.filter(function (v) { return v.brand === brand; })
-      .sort(function (a, b) { return String(a.model).localeCompare(String(b.model), 'en', { numeric: true }); });
+  function setTierCustom() {
+    var sel = $('fTier');
     sel.disabled = false;
-    sel.innerHTML = '<option value="">請選擇車型</option>' + models.map(function (v) {
-      var t = tierOf(v);
-      return '<option value="' + U.esc(v.id) + '">' + U.esc(v.model) + (t ? '　' + U.esc(t.name) : '') + '</option>';
-    }).join('');
+    sel.innerHTML = '<option value="">請選擇最接近的車型</option>' +
+      S.tiers.map(function (t) { return '<option value="' + U.esc(t.id) + '">' + U.esc(t.name) + '　' + U.money(t.price) + '</option>'; }).join('') +
+      '<option value="' + ASK + '">不確定，由店家判斷</option>';
+    $('tierHint').textContent = '找不到您的車款時，可自行選擇最接近的車型；店家會再確認車款與價格。';
   }
 
-  function onModelChange() {
-    var id = $('fModel').value;
-    S.vehicle = S.types.filter(function (v) { return v.id === id; })[0] || null;
-    mark('fModel', false);
+  function onVehicleChange() {
+    var id = $('fVehicle').value;
+    S.otherTier = '';
+    mark('fVehicle', false); mark('fTier', false); mark('fOther', false);
+
+    if (!id) {
+      S.vehicle = null;
+      $('otherField').hidden = true;
+      setTierAuto(null);
+    } else if (id === OTHER) {
+      S.vehicle = { id: 'OTHER' };
+      $('otherField').hidden = false;
+      setTierCustom();
+      $('fOther').focus();
+    } else {
+      S.vehicle = S.types.filter(function (v) { return v.id === id; })[0] || null;
+      $('otherField').hidden = true;
+      setTierAuto(S.vehicle ? tierOf(S.vehicle) : null);
+    }
+    showPreview();
+  }
+
+  function onTierChange() {
+    if (!isOther()) return;
+    var v = $('fTier').value;
+    S.otherTier = (v === ASK) ? '' : v;
+    mark('fTier', false);
     showPreview();
   }
 
   function showPreview() {
-    if (!S.vehicle) { $('pricePreview').hidden = true; return; }
+    if (!S.vehicle || (isOther() && !$('fTier').value)) { $('pricePreview').hidden = true; return; }
     var p = priceInfo();
-    $('ppTier').textContent = p.tier ? '車型級距：' + p.tier : '';
-    $('ppPrice').textContent = p.price != null ? U.money(p.price) : '待店家確認';
+    $('ppTier').textContent = p.tier ? '車型：' + p.tier : '';
+    $('ppPrice').textContent = p.price != null ? U.money(p.price) + (p.tentative ? '（暫估）' : '') : '待店家確認';
     $('pricePreview').hidden = false;
   }
 
   function validateStep2() {
-    mark('fBrand', false); mark('fModel', false); mark('fOther', false);
-    if (!S.loaded) { showError('車型資料尚未載入，請按「重新載入」。'); return false; }
-    if (!$('fBrand').value) { mark('fBrand', true); showError('請選擇廠牌'); $('fBrand').focus(); return false; }
-    if ($('fBrand').value === OTHER) {
+    mark('fVehicle', false); mark('fTier', false); mark('fOther', false);
+    if (!S.loaded) { showError('車種資料尚未載入，請按「重新載入」。'); return false; }
+    if (!S.vehicle) { mark('fVehicle', true); showError('請選擇車種'); $('fVehicle').focus(); return false; }
+    if (isOther()) {
       if (!$('fOther').value.trim()) { mark('fOther', true); showError('請填寫您的車款'); $('fOther').focus(); return false; }
-      return true;
+      if (!$('fTier').value) { mark('fTier', true); showError('請選擇最接近的車型，或選「不確定，由店家判斷」'); $('fTier').focus(); return false; }
     }
-    if (!S.vehicle) { mark('fModel', true); showError('請選擇車型'); $('fModel').focus(); return false; }
     return true;
   }
 
-  /* ---------------- Step 3：地址與時段 ---------------- */
+  /* ---------------- Step 3：地址（含地圖）與時段 ---------------- */
+
+  var mapTimer = null, mapShown = '';
+
+  function updateMap() {
+    var addr = $('fAddress').value.trim();
+    var frame = $('mapIframe');
+    if (addr.length < 5) {
+      frame.hidden = true;
+      $('mapEmpty').hidden = false;
+      $('mapLink').hidden = true;
+      mapShown = '';
+      return;
+    }
+    if (addr === mapShown) return;
+    mapShown = addr;
+    frame.src = 'https://www.google.com/maps?q=' + encodeURIComponent(addr) + '&hl=zh-TW&z=16&output=embed';
+    frame.hidden = false;
+    $('mapEmpty').hidden = true;
+    $('mapLink').href = U.mapUrl(addr);
+    $('mapLink').hidden = false;
+  }
 
   function renderDates() {
     var today = U.serviceToday();
@@ -245,26 +304,34 @@
     });
   }
 
+  /** 這個起始時間能不能選：'ok' | 'past'（已過） | 'full'（跟別人的預約/關閉時段重疊） */
+  function slotState(t) {
+    var a = S.avail;
+    // 後端若沒回傳 now（舊版），就用台北時間自己算，不能讓已過去的時段被選到
+    var now = a.now ? U.wallMs(a.now) : U.wallMs(U.nowStr());
+    if (t <= now) return 'past';
+    var end = t + Number(a.windowHours) * 3600000;
+    var clash = (a.busy || []).some(function (b) { return t < U.wallMs(b.end) && U.wallMs(b.start) < end; });
+    return clash ? 'full' : 'ok';
+  }
+
   function renderSlots() {
     var a = S.avail;
     var start = U.wallMs(a.businessStart), latest = U.wallMs(a.latestStart);
-    var now = U.wallMs(a.now), win = Number(a.windowHours) * 3600000;
-    var busy = (a.busy || []).map(function (b) { return { s: U.wallMs(b.start), e: U.wallMs(b.end) }; });
 
     var groups = { pm: [], eve: [], night: [] };
     var anyOpen = false;
 
     for (var t = start; t <= latest; t += STEP_MIN * 60000) {
-      var past = t <= now;
-      var full = busy.some(function (b) { return t < b.e && b.s < t + win; });
-      var disabled = past || full;
-      if (!disabled) anyOpen = true;
+      var st = slotState(t);
+      if (st === 'ok') anyOpen = true;
       var h = new Date(t).getUTCHours();
       var g = h < 12 ? 'night' : (h < 18 ? 'pm' : 'eve');
+      var cap = st === 'past' ? '已過' : (st === 'full' ? '已滿' : (g === 'night' ? '隔日' : ''));
       groups[g].push(
         '<button type="button" class="slot' + (t === S.slot ? ' selected' : '') + '" data-ms="' + t + '"' +
-        (disabled ? ' disabled title="' + (past ? '已過' : '已被預約') + '"' : '') + '>' +
-        U.hm(t) + (g === 'night' ? '<small>隔日</small>' : '') + '</button>');
+        (st !== 'ok' ? ' disabled title="' + (st === 'past' ? '時間已過' : '與其他預約時段重疊，無法選擇') + '"' : '') + '>' +
+        U.hm(t) + (cap ? '<small>' + cap + '</small>' : '') + '</button>');
     }
 
     var titles = { pm: '下午', eve: '晚間', night: '凌晨（隔日）' };
@@ -276,7 +343,7 @@
     if (!anyOpen) html = '<div class="alert alert-warn" style="margin-top:14px">這一天已額滿或時段已過，請選擇其他日期。</div>' + html;
 
     html += '<div class="legend"><span><i></i>可預約</span><span><i class="full"></i>已滿 / 已過</span><span><i class="sel"></i>已選擇</span></div>' +
-      '<div class="hint">每筆預約約佔用 ' + a.windowHours + ' 小時；請選擇「專員到府牽車」的時間。</div>';
+      '<div class="hint">每筆預約會佔用約 ' + a.windowHours + ' 小時，與他人預約重疊的時間無法選擇。請選擇「專員到府牽車」的時間。</div>';
     $('slotArea').innerHTML = html;
     showPicked();
   }
@@ -310,14 +377,38 @@
     return true;
   }
 
+  /** 進下一步前，再向後端確認一次這個時段還沒被別人搶走 */
+  function confirmSlot() {
+    var btn = $('btnNext');
+    btn.disabled = true;
+    btn.textContent = '確認時段中…';
+    return Api.call('checkAvailability', { serviceDay: S.day }).then(function (data) {
+      S.avail = data;
+      if (slotState(S.slot) !== 'ok') {
+        S.slot = null;
+        renderSlots();
+        showError('這個時段剛剛已被預約或已過，請重新選擇其他時段。');
+        return false;
+      }
+      return true;
+    }).catch(function (err) {
+      showError(err.message);
+      return false;
+    }).then(function (ok) {
+      btn.disabled = false;
+      btn.textContent = LABELS[3];
+      return ok;
+    });
+  }
+
   /* ---------------- Step 4：付款 ---------------- */
 
   function prepPayment() {
     $('bankAccount').textContent = CFG.BANK_ACCOUNT;
     var p = priceInfo();
-    $('bankHint').textContent = p.price != null
+    $('bankHint').textContent = (p.price != null && !p.tentative)
       ? '洗車費用 ' + U.money(p.price) + '；牽車費用依實際距離評估，由店家確認後另行通知。'
-      : '費用由店家確認車型與距離後通知。';
+      : '洗車費用與牽車費用由店家確認車款與距離後通知。';
   }
 
   function onPayChange() {
@@ -343,8 +434,9 @@
     var html =
       row('姓名', U.esc($('fName').value.trim())) +
       row('電話', U.esc($('fPhone').value.replace(/\D/g, ''))) +
-      row('車型', U.esc(vehicleText()) + (p.tier ? '<br><span class="hint">' + U.esc(p.tier) + '</span>' : '')) +
-      row('洗車費用', p.price != null ? U.money(p.price) : '待店家確認') +
+      row('車種', U.esc(vehicleText())) +
+      row('車型', U.esc(p.tier || '—')) +
+      row('洗車費用', U.esc(priceLabel(p))) +
       row('牽車地址', U.esc($('fAddress').value.trim()).replace(/\n/g, '<br>')) +
       row('預約時段', U.esc(slotText())) +
       row('付款方式', S.payment === 'transfer'
@@ -358,7 +450,6 @@
   /* ---------------- 送出 ---------------- */
 
   function payload() {
-    var isOther = S.vehicle.id === 'OTHER';
     return {
       name: $('fName').value.trim(),
       phone: $('fPhone').value.replace(/\D/g, ''),
@@ -366,8 +457,9 @@
       lineId: $('fLine').value.trim(),
       note: $('fNote').value.trim(),
       pickupAddress: $('fAddress').value.trim(),
-      vehicleTypeId: isOther ? 'OTHER' : S.vehicle.id,
-      otherVehicle: isOther ? $('fOther').value.trim() : '',
+      vehicleTypeId: isOther() ? 'OTHER' : S.vehicle.id,
+      otherVehicle: isOther() ? $('fOther').value.trim() : '',
+      otherTierId: isOther() ? S.otherTier : '',
       serviceDay: S.day,
       startTime: U.hm(S.slot),
       paymentMethod: S.payment
@@ -431,11 +523,14 @@
     $('doneOrderNo').textContent = o.orderNo;
     $('lineLink').href = CFG.LINE_OA_URL;
 
-    var priced = !o.needsPricing && o.price !== '' && o.price != null;
+    var hasPrice = o.price !== '' && o.price != null;
+    var confirmed = hasPrice && !U.isTrue(o.needsPricing);
+    var priceText = confirmed ? U.money(o.price) : (hasPrice ? U.money(o.price) + '（暫估，店家確認車款後為準）' : '待店家確認');
+
     $('doneTable').innerHTML =
       row('預約時段', U.esc(o.startAt.slice(5, 16)) + ' ～ ' + U.esc(o.endAt.slice(5, 16))) +
-      row('車型', U.esc(o.vehicleBrand + ' ' + o.vehicleModel)) +
-      row('洗車費用', priced ? U.money(o.price) : '待店家確認') +
+      row('車種', U.esc(o.vehicleBrand + ' ' + o.vehicleModel)) +
+      row('洗車費用', U.esc(priceText)) +
       row('牽車地址', U.esc(o.pickupAddress)) +
       row('付款方式', o.paymentMethod === 'transfer' ? '匯款' : '現場付款');
 
@@ -449,7 +544,7 @@
         '* 購買姓名：' + o.customerName,
         '* 聯絡電話：' + o.phone,
         '* 匯款日期：[年/月/日，如：' + eg + ']',
-        '* 匯款金額：' + (priced ? o.price : '[待店家確認後填寫]') + ' 元',
+        '* 匯款金額：' + (confirmed ? o.price : '[待店家確認後填寫]') + ' 元',
         '* 轉出帳號末五碼：[請填寫您用來轉帳的帳戶末 5 碼]',
         '',
         '已完成線上轉帳，請您核對。謝謝！'
@@ -465,15 +560,21 @@
     var n = S.step;
     if (n === 1 && validateStep1()) go(2);
     else if (n === 2 && validateStep2()) go(3);
-    else if (n === 3 && validateStep3()) go(4);
+    else if (n === 3 && validateStep3()) confirmSlot().then(function (ok) { if (ok) go(4); });
     else if (n === 4 && validateStep4()) go(5);
     else if (n === 5) submit();
   });
   $('btnBack').addEventListener('click', function () { if (S.step > 1) go(S.step - 1); });
 
-  $('fBrand').addEventListener('change', onBrandChange);
-  $('fModel').addEventListener('change', onModelChange);
+  $('fVehicle').addEventListener('change', onVehicleChange);
+  $('fTier').addEventListener('change', onTierChange);
+  $('fOther').addEventListener('input', function () { mark('fOther', false); });
   $('vehRetry').addEventListener('click', loadVehicles);
+
+  $('fAddress').addEventListener('input', function () {
+    clearTimeout(mapTimer);
+    mapTimer = setTimeout(updateMap, 700);
+  });
 
   $('dates').addEventListener('click', function (e) {
     var b = e.target.closest('.date-chip');

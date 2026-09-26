@@ -7,7 +7,7 @@
   function safeGet() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
   function safeSet(v) { try { v ? localStorage.setItem(KEY_STORE, v) : localStorage.removeItem(KEY_STORE); } catch (e) { /* 無痕模式等 */ } }
 
-  var REQUIRED_BACKEND = 3;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
+  var REQUIRED_BACKEND = 4;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
   var S = { orders: [], tiers: [], types: [], customers: [], open: null, closures: [] };
 
   /* ---------------- 呼叫後端（密碼失效時自動回登入畫面） ---------------- */
@@ -122,7 +122,8 @@
   }
 
   function vehLabel(o) { return (o.vehicleBrand || '') + ' ' + (o.vehicleModel || ''); }
-  function priced(o) { return !U.isTrue(o.needsPricing) && o.price !== '' && o.price != null; }
+  function hasPrice(o) { return o.price !== '' && o.price != null; }
+  function needsConfirm(o) { return U.isTrue(o.needsPricing); }
 
   function stateTag(o) {
     var s = U.orderState(o);
@@ -140,11 +141,11 @@
 
     var active = S.orders.filter(function (o) { return o.status === 'ACTIVE'; });
     var unverified = active.filter(function (o) { return o.paymentMethod === 'transfer' && !U.isTrue(o.verified); }).length;
-    var unpriced = active.filter(function (o) { return !priced(o); }).length;
+    var unpriced = active.filter(needsConfirm).length;
     $('ordStats').innerHTML =
       '<div class="stat"><b>' + rows.length + '</b>筆</div>' +
       '<div class="stat"><b>' + unverified + '</b>匯款待核對</div>' +
-      '<div class="stat"><b>' + unpriced + '</b>待報價</div>';
+      '<div class="stat"><b>' + unpriced + '</b>待確認</div>';
 
     var tbody = $('ordTable').querySelector('tbody');
     tbody.innerHTML = rows.map(function (o) {
@@ -152,8 +153,8 @@
       return '<tr class="click' + (off ? ' off' : '') + '" data-order="' + U.esc(o.orderNo) + '">' +
         '<td><b class="strike">' + U.esc(o.serviceDay.slice(5)) + '</b><br><span class="strike">' + U.esc(o.startAt.slice(11, 16)) + '–' + U.esc(o.endAt.slice(11, 16)) + '</span></td>' +
         '<td>' + U.esc(o.customerName) + '<br><span class="hint">' + U.esc(o.phone) + '</span></td>' +
-        '<td>' + U.esc(vehLabel(o)) + (U.isTrue(o.needsPricing) ? ' <span class="tag amber">待報價</span>' : '') + '</td>' +
-        '<td>' + (priced(o) ? U.money(o.price) : '—') + '</td>' +
+        '<td>' + U.esc(vehLabel(o)) + (needsConfirm(o) ? ' <span class="tag amber">待確認</span>' : '') + '</td>' +
+        '<td>' + (hasPrice(o) ? U.money(o.price) : '—') + '</td>' +
         '<td>' + (o.paymentMethod === 'transfer' ? '匯款' : '現場') + '</td>' +
         '<td>' + verifyTag(o) + '</td>' +
         '<td>' + stateTag(o) + '</td></tr>';
@@ -202,8 +203,9 @@
       kv('建立時間', U.esc(o.createdAt)) +
       (o.status !== 'ACTIVE' ? kv('取消', U.esc((o.cancelledBy === 'admin' ? '店家' : '客人') + ' · ' + o.cancelledAt + (o.cancelReason ? ' · ' + o.cancelReason : ''))) : '');
 
-    $('omPrice').value = priced(o) ? o.price : '';
-    $('omPriceHint').textContent = priced(o) ? '' : '此單為「待確認車型」，請確認後填入金額。';
+    $('omPrice').value = hasPrice(o) ? o.price : '';
+    $('omPriceHint').textContent = !needsConfirm(o) ? '' :
+      (hasPrice(o) ? '客人自選車型，金額為暫估。確認車款後按「儲存」即可取消「待確認」標記。' : '此單為「待確認車型」，請確認後填入金額。');
     $('omNote').value = o.adminNote || '';
 
     var active = o.status === 'ACTIVE';
@@ -436,7 +438,7 @@
       var c = d.customer || {};
       var rows = d.orders.map(function (o) {
         return '<tr class="click' + (o.status !== 'ACTIVE' ? ' off' : '') + '" data-open="' + U.esc(o.orderNo) + '"><td>' + U.esc(o.orderNo) + '</td><td>' + U.esc(o.serviceDay) + '</td><td>' +
-          U.esc(vehLabel(o)) + '</td><td>' + (priced(o) ? U.money(o.price) : '待報價') + '</td><td>' + stateTag(o) + '</td></tr>';
+          U.esc(vehLabel(o)) + '</td><td>' + (hasPrice(o) ? U.money(o.price) : '待報價') + '</td><td>' + stateTag(o) + '</td></tr>';
       }).join('');
       $('crmHistory').innerHTML =
         '<div class="card" style="margin-top:16px"><h2>' + U.esc(c.name || phone) + ' 的消費紀錄</h2>' +
