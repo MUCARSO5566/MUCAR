@@ -7,7 +7,7 @@
   function safeGet() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
   function safeSet(v) { try { v ? localStorage.setItem(KEY_STORE, v) : localStorage.removeItem(KEY_STORE); } catch (e) { /* 無痕模式等 */ } }
 
-  var REQUIRED_BACKEND = 5;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
+  var REQUIRED_BACKEND = 6;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
   var S = { orders: [], tiers: [], types: [], customers: [], open: null, closures: [] };
 
   /* ---------------- 呼叫後端（密碼失效時自動回登入畫面） ---------------- */
@@ -95,6 +95,7 @@
     loadClosures();
     loadVehicles();
     loadCustomers();
+    loadNotify();
   }
 
   /* ============================================================
@@ -455,6 +456,66 @@
     var o = (S.historyOrders || []).filter(function (x) { return x.orderNo === tr.dataset.open; })[0];
     if (o && !S.orders.some(function (x) { return x.orderNo === o.orderNo; })) S.orders.push(o);
     openOrder(tr.dataset.open);
+  });
+
+  /* ============================================================
+   *  通知與日曆
+   * ============================================================ */
+
+  function showNotify(st) {
+    $('ntMailOn').checked = !!st.notifyEnabled;
+    $('ntCalOn').checked = !!st.calendarEnabled;
+    $('ntEmails').value = (st.emails || []).join('\n');
+    $('ntSender').textContent = st.sender || '（部署 Apps Script 的 Google 帳號）';
+    $('ntSenderName').textContent = st.senderName || '';
+    $('ntQuota').textContent = st.quota == null ? '—' : st.quota + ' 封';
+    $('ntCalName').textContent = st.calendarName || '沐車所預約';
+    $('ntCalState').textContent = st.calendarReady ? '已建立，運作中' : '尚未建立（收到第一筆預約或按「測試日曆行程」時會自動建立）';
+    var le = $('ntLastError');
+    if (st.lastError) {
+      le.innerHTML = '<b>上一次通知失敗</b>（' + U.esc(st.lastError.at) + '）：' + U.esc(st.lastError.msg);
+      le.hidden = false;
+    } else {
+      le.hidden = true;
+    }
+  }
+
+  function loadNotify() {
+    call('getNotifyStatus', {}).then(showNotify).catch(function (err) {
+      $('ntError').textContent = /未知的 action/.test(err.message)
+        ? '後端程式還不是最新版，請重新貼上 Code.gs 並部署新版本。' : err.message;
+      $('ntError').hidden = false;
+    });
+  }
+
+  $('ntSave').addEventListener('click', function () {
+    $('ntError').hidden = true;
+    $('ntSave').disabled = true;
+    call('saveNotifySettings', {
+      emails: $('ntEmails').value,
+      notifyEnabled: $('ntMailOn').checked,
+      calendarEnabled: $('ntCalOn').checked
+    }).then(function (st) { showNotify(st); U.toast('通知設定已儲存'); })
+      .catch(function (err) { $('ntError').textContent = err.message; $('ntError').hidden = false; })
+      .then(function () { $('ntSave').disabled = false; });
+  });
+
+  function runTest(btn, kind, okMsg) {
+    $('ntError').hidden = true;
+    var label = btn.textContent;
+    btn.disabled = true; btn.textContent = '測試中…';
+    call('sendTestNotify', { kind: kind }).then(function (r) {
+      U.toast(typeof okMsg === 'function' ? okMsg(r) : okMsg);
+      loadNotify();
+    }).catch(function (err) { $('ntError').textContent = err.message; $('ntError').hidden = false; })
+      .then(function () { btn.disabled = false; btn.textContent = label; });
+  }
+
+  $('ntTestMail').addEventListener('click', function () {
+    runTest(this, 'email', function (r) { return '測試信已寄出（' + r.sent + ' 個信箱），請查看收件匣'; });
+  });
+  $('ntTestCal').addEventListener('click', function () {
+    runTest(this, 'calendar', '日曆連線正常：測試行程已建立並刪除');
   });
 
   /* ============================================================
