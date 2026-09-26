@@ -34,7 +34,7 @@
       row('車型', U.esc(o.vehicleBrand + ' ' + o.vehicleModel)) +
       row('洗車費用', priced ? U.money(o.price) : '待店家確認') +
       row('牽車地址', U.esc(o.pickupAddress || '—')) +
-      row('付款方式', o.paymentMethod === 'transfer' ? '匯款（末五碼 ' + U.esc(o.transferLast5) + '）' : '現場付款') +
+      row('付款方式', o.paymentMethod === 'transfer' ? '匯款' : '現場付款') +
       (o.note ? row('備註', U.esc(o.note)) : '') +
       '</table>';
 

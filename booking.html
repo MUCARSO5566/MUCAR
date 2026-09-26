@@ -130,7 +130,7 @@
     <div class="choice" id="payChoice">
       <label id="payTransferLabel">
         <input type="radio" name="payment" value="transfer">
-        <div><b>匯款</b><span>先匯款，並把匯款通知貼到官方 LINE 給店家核對。</span></div>
+        <div><b>匯款</b><span>轉帳後，把匯款截圖與轉出帳號末五碼傳到官方 LINE 給店家核對。</span></div>
       </label>
       <label id="payOnsiteLabel">
         <input type="radio" name="payment" value="onsite">
@@ -145,18 +145,11 @@
         <button class="btn btn-secondary btn-sm" id="copyBank" type="button">複製帳號</button>
       </div>
       <div class="hint" id="bankHint" style="margin-bottom:14px"></div>
-      <div class="row2">
-        <div class="field" style="margin-top:0">
-          <label for="fTransferDate">匯款日期<span class="req">*</span></label>
-          <input id="fTransferDate" type="date">
-        </div>
-        <div class="field" style="margin-top:0">
-          <label for="fLast5">轉出帳號末五碼<span class="req">*</span></label>
-          <input id="fLast5" type="text" inputmode="numeric" maxlength="5" placeholder="12345" autocomplete="off">
-        </div>
+      <div class="alert alert-warn" style="margin-bottom:0">
+        <b>匯款後請務必到官方 LINE 提供：</b><br>
+        ① 匯款截圖　② 轉出帳號末五碼<br>
+        預約送出後，畫面會提供一份匯款通知範本，可直接複製貼到官方 LINE。
       </div>
-      <div class="field-err" id="errTransfer" hidden></div>
-      <div class="hint">送出預約後，畫面會產生一段匯款通知，請複製貼到官方 LINE。</div>
     </div>
   </section>
 

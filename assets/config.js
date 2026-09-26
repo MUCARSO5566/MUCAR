@@ -10,7 +10,7 @@ window.CARWASH_CONFIG = {
    * 取得方式：Apps Script → 部署 → 管理部署作業 → 複製「網頁應用程式網址」。
    * ⚠️ 不是 Google 試算表的網址（docs.google.com/spreadsheets/...），貼錯網頁會顯示紅色提示。
    */
-  API_URL: 'PUT_YOUR_APPS_SCRIPT_EXEC_URL_HERE',
+  API_URL: 'https://script.google.com/macros/s/AKfycbyaAwZK19VEdhTFm0P6k14FxQwuPFX1Kw5Yd3ccaTzqlS6E3NsGEvGyuBR2PQq1mOfy/exec',
 
   /* 前台公開金鑰，要跟 Code.gs 的 PUBLIC_KEY 一致（純防呆，不是真正密碼） */
   PUBLIC_KEY: 'qazb5566',

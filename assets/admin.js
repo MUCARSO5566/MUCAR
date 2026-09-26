@@ -178,7 +178,7 @@
       kv('牽車地址', U.esc(o.pickupAddress || '—') + (o.pickupAddress ? '　<a href="' + U.esc(U.mapUrl(o.pickupAddress)) + '" target="_blank" rel="noopener">開啟地圖</a>' : '')) +
       kv('預約時段', U.esc(o.startAt.slice(0, 16)) + ' ～ ' + U.esc(o.endAt.slice(11, 16))) +
       kv('付款方式', o.paymentMethod === 'transfer'
-        ? '匯款<br><span class="hint">匯款日期 ' + U.esc(o.transferDate) + '　轉出末五碼 <b>' + U.esc(o.transferLast5) + '</b>　' + (U.isTrue(o.verified) ? '（已核對）' : '（未核對）') + '</span>'
+        ? '匯款<br><span class="hint">' + (U.isTrue(o.verified) ? '已核對（款項已確認）' : '未核對（等客人在官方 LINE 提供截圖與末五碼）') + '</span>'
         : '現場付款') +
       kv('客人備註', U.esc(o.note || '—').replace(/\n/g, '<br>')) +
       kv('建立時間', U.esc(o.createdAt)) +

@@ -318,9 +318,6 @@
     $('bankHint').textContent = p.price != null
       ? '洗車費用 ' + U.money(p.price) + '；牽車費用依實際距離評估，由店家確認後另行通知。'
       : '費用由店家確認車型與距離後通知。';
-    var today = U.nowStr().slice(0, 10);
-    $('fTransferDate').max = today;
-    if (!$('fTransferDate').value) $('fTransferDate').value = today;
   }
 
   function onPayChange() {
@@ -333,12 +330,7 @@
   }
 
   function validateStep4() {
-    setErr('errTransfer', ''); mark('fTransferDate', false); mark('fLast5', false);
     if (!S.payment) { showError('請選擇付款方式'); return false; }
-    if (S.payment === 'transfer') {
-      if (!$('fTransferDate').value) { mark('fTransferDate', true); setErr('errTransfer', '請選擇匯款日期'); return false; }
-      if (!/^\d{5}$/.test($('fLast5').value.trim())) { mark('fLast5', true); setErr('errTransfer', '請輸入轉出帳號末五碼（5 碼數字）'); $('fLast5').focus(); return false; }
-    }
     return true;
   }
 
@@ -356,7 +348,7 @@
       row('牽車地址', U.esc($('fAddress').value.trim()).replace(/\n/g, '<br>')) +
       row('預約時段', U.esc(slotText())) +
       row('付款方式', S.payment === 'transfer'
-        ? '匯款<br><span class="hint">匯款日期 ' + U.esc($('fTransferDate').value) + '　末五碼 ' + U.esc($('fLast5').value.trim()) + '</span>'
+        ? '匯款<br><span class="hint">匯款後請把截圖與轉出帳號末五碼傳到官方 LINE</span>'
         : '現場付款');
     var note = $('fNote').value.trim();
     if (note) html += row('備註', U.esc(note).replace(/\n/g, '<br>'));
@@ -378,9 +370,7 @@
       otherVehicle: isOther ? $('fOther').value.trim() : '',
       serviceDay: S.day,
       startTime: U.hm(S.slot),
-      paymentMethod: S.payment,
-      transferDate: S.payment === 'transfer' ? $('fTransferDate').value : '',
-      transferLast5: S.payment === 'transfer' ? $('fLast5').value.trim() : ''
+      paymentMethod: S.payment
     };
   }
 
@@ -450,15 +440,20 @@
       row('付款方式', o.paymentMethod === 'transfer' ? '匯款' : '現場付款');
 
     if (o.paymentMethod === 'transfer') {
-      $('noticeText').textContent =
-        '【網購匯款通知】\n\n' +
-        '訂單編號：' + o.orderNo + '\n' +
-        '購買姓名：' + o.customerName + '\n' +
-        '聯絡電話：' + o.phone + '\n' +
-        '匯款日期：' + o.transferDate + '\n' +
-        '匯款金額：' + (priced ? o.price : '（待店家確認）') + ' 元\n' +
-        '轉出帳號末五碼：' + o.transferLast5 + '\n\n' +
-        '已完成線上轉帳，請您核對。謝謝！';
+      var n = U.taipeiNow();
+      var eg = n.y + '/' + U.pad2(n.M) + '/' + U.pad2(n.d);
+      $('noticeText').textContent = [
+        '【網購匯款通知】',
+        '',
+        '* 訂單編號：' + o.orderNo,
+        '* 購買姓名：' + o.customerName,
+        '* 聯絡電話：' + o.phone,
+        '* 匯款日期：[年/月/日，如：' + eg + ']',
+        '* 匯款金額：' + (priced ? o.price : '[待店家確認後填寫]') + ' 元',
+        '* 轉出帳號末五碼：[請填寫您用來轉帳的帳戶末 5 碼]',
+        '',
+        '已完成線上轉帳，請您核對。謝謝！'
+      ].join('\n');
       $('transferNoticeArea').hidden = false;
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -493,7 +488,6 @@
   Array.prototype.forEach.call(document.querySelectorAll('input[name="payment"]'), function (r) {
     r.addEventListener('change', onPayChange);
   });
-  $('fLast5').addEventListener('input', function () { this.value = this.value.replace(/\D/g, '').slice(0, 5); });
   $('fAgree').addEventListener('change', function () { $('btnNext').disabled = !this.checked; });
 
   $('copyBank').addEventListener('click', function () {
