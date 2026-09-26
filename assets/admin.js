@@ -7,7 +7,7 @@
   function safeGet() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
   function safeSet(v) { try { v ? localStorage.setItem(KEY_STORE, v) : localStorage.removeItem(KEY_STORE); } catch (e) { /* 無痕模式等 */ } }
 
-  var REQUIRED_BACKEND = 4;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
+  var REQUIRED_BACKEND = 5;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
   var S = { orders: [], tiers: [], types: [], customers: [], open: null, closures: [] };
 
   /* ---------------- 呼叫後端（密碼失效時自動回登入畫面） ---------------- */
@@ -455,6 +455,34 @@
     var o = (S.historyOrders || []).filter(function (x) { return x.orderNo === tr.dataset.open; })[0];
     if (o && !S.orders.some(function (x) { return x.orderNo === o.orderNo; })) S.orders.push(o);
     openOrder(tr.dataset.open);
+  });
+
+  /* ============================================================
+   *  帳號安全：更改後台密碼
+   * ============================================================ */
+
+  $('pwForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var err = $('pwError');
+    err.hidden = true;
+    var cur = $('pwCurrent').value, nw = $('pwNew').value, cf = $('pwConfirm').value;
+    function bad(msg) { err.textContent = msg; err.hidden = false; }
+
+    if (!cur || !nw) return bad('請填寫目前的密碼與新密碼');
+    if (nw.length < 8) return bad('新密碼至少要 8 個字元');
+    if (nw !== cf) return bad('兩次輸入的新密碼不一樣');
+    if (nw === cur) return bad('新密碼不能跟目前的密碼相同');
+    if (nw === CFG.PUBLIC_KEY) return bad('新密碼不能跟前台金鑰相同');
+    if (/mucar|5566|1234|password/i.test(nw) &&
+        !confirm('這組密碼含有店名、常見數字或字詞，很容易被猜到，而後台裡有客戶的姓名、電話與地址。\n\n確定仍要使用這組密碼嗎？')) return;
+
+    $('pwBtn').disabled = true;
+    call('changeAdminPassword', { currentPassword: cur, newPassword: nw }).then(function () {
+      Api.key = nw;
+      safeSet(nw);
+      $('pwForm').reset();
+      U.toast('密碼已更改，下次登入請用新密碼');
+    }).catch(function (e2) { bad(e2.message); }).then(function () { $('pwBtn').disabled = false; });
   });
 
   /* ---------------- 啟動 ---------------- */

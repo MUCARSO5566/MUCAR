@@ -49,6 +49,7 @@
     <button class="tab-btn" data-tab="slots" type="button">時段設定</button>
     <button class="tab-btn" data-tab="vehicles" type="button">車型計價</button>
     <button class="tab-btn" data-tab="crm" type="button">客戶 CRM</button>
+    <button class="tab-btn" data-tab="account" type="button">帳號安全</button>
   </div>
 
   <!-- 訂單 -->
@@ -180,6 +181,34 @@
       <div class="empty" id="crmEmpty" hidden>還沒有客戶資料。</div>
     </div>
     <div id="crmHistory"></div>
+  </section>
+
+  <!-- 帳號安全 -->
+  <section id="tab-account" class="tab-panel" hidden>
+    <div class="card" style="max-width:520px">
+      <h2>變更後台密碼</h2>
+      <p class="hint" style="margin:4px 0 14px">改好後立刻生效，不需要動 Apps Script。之後重貼 Code.gs 也不會被蓋回去。</p>
+      <div id="pwError" class="alert alert-danger" hidden></div>
+      <form id="pwForm" autocomplete="off">
+        <div class="field">
+          <label for="pwCurrent">目前的密碼</label>
+          <input id="pwCurrent" type="password" autocomplete="current-password">
+        </div>
+        <div class="field">
+          <label for="pwNew">新密碼</label>
+          <input id="pwNew" type="password" autocomplete="new-password" minlength="8" maxlength="64">
+          <div class="hint">至少 8 個字元。建議 12 個字元以上、英文大小寫加數字，不要用店名、電話或生日。</div>
+        </div>
+        <div class="field">
+          <label for="pwConfirm">再輸入一次新密碼</label>
+          <input id="pwConfirm" type="password" autocomplete="new-password">
+        </div>
+        <div class="btn-row" style="margin-top:18px">
+          <button class="btn btn-primary" id="pwBtn" type="submit">更改密碼</button>
+        </div>
+      </form>
+      <p class="hint" style="margin-top:16px">忘記密碼時：到 Apps Script 編輯器執行 <b>resetAdminPassword</b>，密碼會恢復成 Code.gs 裡的 ADMIN_KEY。連續輸入錯誤 10 次會鎖住後台 10 分鐘，可執行 <b>clearAdminLock</b> 立刻解除。</p>
+    </div>
   </section>
 
 </main>
