@@ -7,6 +7,7 @@
   function safeGet() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
   function safeSet(v) { try { v ? localStorage.setItem(KEY_STORE, v) : localStorage.removeItem(KEY_STORE); } catch (e) { /* 無痕模式等 */ } }
 
+  var REQUIRED_BACKEND = 3;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
   var S = { orders: [], tiers: [], types: [], customers: [], open: null, closures: [] };
 
   /* ---------------- 呼叫後端（密碼失效時自動回登入畫面） ---------------- */
@@ -52,10 +53,27 @@
     });
   }
 
+  /** 檢查已部署的後端是不是最新版；舊版會出現各種奇怪問題，所以直接提醒 */
+  function checkBackendVersion() {
+    if (problem) return;
+    Api.call('ping', {}).then(function (v) {
+      if (Number(v.version) < REQUIRED_BACKEND) {
+        $('verBanner').innerHTML = '<b>後端程式還不是最新版</b>（目前 v' + U.esc(v.version) + '，這個網站需要 v' + REQUIRED_BACKEND + ' 以上）。' +
+          '請把最新的 Code.gs 整份貼進 Apps Script，再用「部署 → 管理部署作業 → 編輯 → 版本選新版本」重新部署（不要用「新增部署作業」，那會產生新網址）。';
+        $('verBanner').hidden = false;
+      }
+    }).catch(function () { /* 連不到就先不提示 */ });
+  }
+
   $('loginForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var k = $('loginPwd').value.trim();
     if (!k) return;
+    if (k === CFG.PUBLIC_KEY) {
+      $('loginError').textContent = '這是前台金鑰（PUBLIC_KEY），不能當後台密碼。請輸入你在 Code.gs 設定的 ADMIN_KEY。';
+      $('loginError').hidden = false;
+      return;
+    }
     $('loginBtn').disabled = true;
     enter(k, false).then(function () { $('loginBtn').disabled = false; });
   });
@@ -439,6 +457,7 @@
 
   /* ---------------- 啟動 ---------------- */
 
+  checkBackendVersion();
   var saved = safeGet();
   if (saved && !problem) enter(saved, true); else showLogin();
 })();

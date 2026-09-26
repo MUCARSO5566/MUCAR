@@ -31,15 +31,21 @@
     return '';
   }
 
+  /** 只有「讀取」類的請求才會自動重試一次（重送不會造成重複寫入） */
+  var READS = ['ping', 'bootBooking', 'checkAvailability', 'checkPhoneActive', 'lookupOrder',
+    'listOrders', 'listRows', 'getCustomers', 'getCustomerHistory'];
+
   function parse(text) {
     var data;
     try {
       data = JSON.parse(text);
     } catch (e) {
-      if (text.indexOf('doGet') >= 0 || text.indexOf('doPost') >= 0) {
-        throw new Error('後端程式碼還沒貼上或還沒重新部署');
-      }
-      throw new Error('後端回應格式錯誤，請確認 Apps Script 部署權限是「任何人」');
+      var msg = (text.indexOf('doGet') >= 0 || text.indexOf('doPost') >= 0)
+        ? '後端程式碼還沒貼上或還沒重新部署'
+        : '後端回應格式錯誤，請確認 Apps Script 部署權限是「任何人」；如果剛剛才能用，請稍後再試一次';
+      var err = new Error(msg);
+      err.retryable = true;   // Google 偶爾會臨時回一頁 HTML 錯誤頁
+      throw err;
     }
     if (!data.ok) throw new Error(data.error || '未知錯誤');
     return data.data;
@@ -54,16 +60,28 @@
       if (problem) return Promise.reject(new Error(problem));
 
       var body = JSON.stringify(Object.assign({}, payload || {}, { action: action, key: this.key }));
-      return fetch(CFG.API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: body,
-        redirect: 'follow'
-      }).then(function (res) {
-        return res.text();
-      }).then(parse).catch(function (err) {
-        if (err instanceof TypeError) throw new Error('連不到後端，請檢查網路，或確認 config.js 的 API_URL 是否正確');
-        throw err;
+      function send() {
+        return fetch(CFG.API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: body,
+          redirect: 'follow'
+        }).then(function (res) {
+          return res.text();
+        }).then(parse).catch(function (err) {
+          if (err instanceof TypeError) {
+            var e2 = new Error('連不到後端，請檢查網路，或確認 config.js 的 API_URL 是否正確');
+            e2.retryable = true;
+            throw e2;
+          }
+          throw err;
+        });
+      }
+
+      var canRetry = READS.indexOf(action) >= 0;
+      return send().catch(function (err) {
+        if (!(canRetry && err.retryable)) throw err;
+        return new Promise(function (r) { setTimeout(r, 900); }).then(send);
       });
     }
   };
