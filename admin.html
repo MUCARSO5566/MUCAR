@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#F4F1EC">
 <title>店家後台｜沐車所 MUCAR</title>
-<link rel="stylesheet" href="assets/style.css?v=3">
+<link rel="stylesheet" href="assets/style.css?v=4">
 </head>
 <body>
 
@@ -20,7 +20,7 @@
   </div>
 </header>
 
-<div class="wrap" style="padding:16px 16px 0;max-width:1120px"><div id="verBanner" class="alert alert-warn" hidden></div></div>
+<div id="verBanner" class="alert alert-warn ver-banner" hidden></div>
 
 <!-- 登入 -->
 <main id="loginMask" class="wrap" style="padding-top:48px">
@@ -56,32 +56,34 @@
   <!-- 訂單 -->
   <section id="tab-orders" class="tab-panel">
     <div class="card">
-      <div class="toolbar">
-        <div class="presets">
+      <div class="filters">
+        <div class="presets" role="group" aria-label="快速選擇日期">
           <button class="btn btn-secondary btn-sm" data-preset="today" type="button">今天</button>
           <button class="btn btn-secondary btn-sm" data-preset="tomorrow" type="button">明天</button>
           <button class="btn btn-secondary btn-sm" data-preset="week" type="button">未來 7 天</button>
           <button class="btn btn-secondary btn-sm" data-preset="all" type="button">全部</button>
         </div>
-      </div>
-      <div class="toolbar">
-        <div class="field"><label for="ordFrom">起（營業日）</label><input id="ordFrom" type="date"></div>
-        <div class="field"><label for="ordTo">迄</label><input id="ordTo" type="date"></div>
-        <div class="field">
-          <label for="ordStatus">狀態</label>
-          <select id="ordStatus">
-            <option value="">全部</option>
+        <div class="filter-row">
+          <select id="ordStatus" aria-label="狀態">
+            <option value="">全部狀態</option>
             <option value="ACTIVE">預約中</option>
             <option value="DONE">已完成</option>
             <option value="CANCELLED">已取消</option>
           </select>
+          <button class="btn btn-primary btn-sm" id="ordSearch" type="button">重新整理</button>
         </div>
-        <button class="btn btn-primary btn-sm" id="ordSearch" type="button">查詢</button>
+        <details class="range">
+          <summary>自訂日期範圍<span class="hint" id="ordRange" style="margin:0"></span></summary>
+          <div class="row2">
+            <div class="field"><label for="ordFrom">起（營業日）</label><input id="ordFrom" type="date"></div>
+            <div class="field"><label for="ordTo">迄</label><input id="ordTo" type="date"></div>
+          </div>
+        </details>
       </div>
       <div id="ordError" class="alert alert-danger" hidden></div>
       <div class="stats" id="ordStats"></div>
       <div class="table-scroll">
-        <table class="data" id="ordTable">
+        <table class="data cardify t-orders" id="ordTable">
           <thead><tr>
             <th>時段</th><th>客人</th><th>車型</th><th>金額</th><th>付款</th><th>核對</th><th>狀態</th>
           </tr></thead>
@@ -124,7 +126,7 @@
       <div class="btn-row" style="margin-top:14px"><button class="btn btn-primary btn-sm" id="cloAdd" type="button">新增關閉</button></div>
       <div id="cloError" class="alert alert-danger" style="margin-top:12px" hidden></div>
       <div class="table-scroll" style="margin-top:16px">
-        <table class="data" id="cloTable" style="min-width:480px">
+        <table class="data cardify t-clo" id="cloTable" style="min-width:480px">
           <thead><tr><th>營業日</th><th>範圍</th><th>原因</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
@@ -139,7 +141,7 @@
       <h2>車型級距價格</h2>
       <p class="hint" style="margin-bottom:10px">修改級距價格後，該級距底下所有車型的新預約都會套用新價格（舊訂單不受影響）。</p>
       <div class="table-scroll">
-        <table class="data" id="tierTable" style="min-width:380px">
+        <table class="data cardify t-tier" id="tierTable" style="min-width:380px">
           <thead><tr><th>級距</th><th>洗車價格</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
@@ -158,7 +160,7 @@
       <div class="field" style="margin-top:18px"><label for="vehFilter">搜尋</label><input id="vehFilter" type="text" placeholder="輸入廠牌或型號…"></div>
       <div class="hint" id="vehCount" style="margin:8px 0"></div>
       <div class="table-scroll">
-        <table class="data" id="vehTable" style="min-width:520px">
+        <table class="data cardify t-veh" id="vehTable" style="min-width:520px">
           <thead><tr><th>廠牌</th><th>型號</th><th>級距</th><th>開放預約</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
@@ -174,7 +176,7 @@
       <div class="field"><label for="crmSearch">搜尋</label><input id="crmSearch" type="text" placeholder="電話或姓名…"></div>
       <div class="stats" id="crmStats" style="margin-top:12px"></div>
       <div class="table-scroll">
-        <table class="data" id="crmTable" style="min-width:560px">
+        <table class="data cardify t-crm" id="crmTable" style="min-width:560px">
           <thead><tr><th>姓名</th><th>電話</th><th>LINE</th><th>消費次數</th><th>累計金額</th><th>最近預約</th></tr></thead>
           <tbody></tbody>
         </table>
@@ -283,19 +285,19 @@
       </div>
     </div>
 
-    <div class="btn-row">
-      <button class="btn btn-primary btn-sm" id="omSave" type="button">儲存金額 / 備註</button>
+    <div class="modal-actions">
+      <button class="btn btn-primary btn-sm span2" id="omSave" type="button">儲存金額 / 備註</button>
       <button class="btn btn-secondary btn-sm" id="omVerify" type="button"></button>
       <button class="btn btn-secondary btn-sm" id="omCal" type="button"></button>
       <button class="btn btn-danger btn-sm" id="omCancel" type="button">取消預約</button>
-      <button class="btn btn-ghost btn-sm" id="omClose" type="button" style="margin-left:auto">關閉</button>
+      <button class="btn btn-ghost btn-sm" id="omClose" type="button">關閉</button>
     </div>
   </div>
 </div>
 
-<script src="assets/config.js?v=3"></script>
-<script src="assets/util.js?v=3"></script>
-<script src="assets/api.js?v=3"></script>
-<script src="assets/admin.js?v=3"></script>
+<script src="assets/config.js?v=4"></script>
+<script src="assets/util.js?v=4"></script>
+<script src="assets/api.js?v=4"></script>
+<script src="assets/admin.js?v=4"></script>
 </body>
 </html>

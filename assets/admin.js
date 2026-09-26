@@ -86,6 +86,8 @@
       Array.prototype.forEach.call(document.querySelectorAll('.tab-btn'), function (b) { b.classList.toggle('active', b === btn); });
       Array.prototype.forEach.call(document.querySelectorAll('.tab-panel'), function (p) { p.hidden = true; });
       $('tab-' + btn.dataset.tab).hidden = false;
+      btn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      try { sessionStorage.setItem('mucar_admin_tab', btn.dataset.tab); } catch (e) { /* ignore */ }
     });
   });
 
@@ -96,13 +98,24 @@
     loadVehicles();
     loadCustomers();
     loadNotify();
+    var t = '';
+    try { t = sessionStorage.getItem('mucar_admin_tab') || ''; } catch (e) { /* ignore */ }
+    var tb = t && document.querySelector('[data-tab="' + t + '"]');
+    if (tb) tb.click();
   }
 
   /* ============================================================
    *  預約訂單
    * ============================================================ */
 
+  function markPreset(p) {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-preset]'), function (b) {
+      b.classList.toggle('active', b.dataset.preset === p);
+    });
+  }
+
   function setPreset(p) {
+    markPreset(p);
     var t = U.serviceToday();
     var from = t, to = t;
     if (p === 'tomorrow') { from = to = U.addDays(t, 1); }
@@ -113,7 +126,13 @@
     loadOrders();
   }
 
+  function showRange() {
+    var f = $('ordFrom').value, t = $('ordTo').value;
+    $('ordRange').textContent = f || t ? '（' + (f || '…') + ' ～ ' + (t || '…') + '）' : '（全部日期）';
+  }
+
   function loadOrders() {
+    showRange();
     $('ordError').hidden = true;
     return call('listOrders', { from: $('ordFrom').value, to: $('ordTo').value }).then(function (rows) {
       S.orders = rows;
@@ -132,10 +151,11 @@
   }
   function verifyTag(o) {
     if (o.status !== 'ACTIVE') return '<span class="hint">—</span>';
-    if (o.paymentMethod !== 'transfer') return '<span class="hint">現場付款</span>';
+    if (o.paymentMethod !== 'transfer') return '';
     return U.isTrue(o.verified) ? '<span class="tag ok">已核對</span>' : '<span class="tag amber">未核對</span>';
   }
 
+  /* 注意：下面每一列 <td> 的順序要跟 style.css 裡 table.t-orders 的 nth-child 卡片版面一致 */
   function renderOrders() {
     var f = $('ordStatus').value;
     var rows = S.orders.filter(function (o) { return !f || U.orderState(o) === f; });
@@ -178,6 +198,9 @@
     b.addEventListener('click', function () { setPreset(b.dataset.preset); });
   });
   $('ordSearch').addEventListener('click', loadOrders);
+  ['ordFrom', 'ordTo'].forEach(function (id) {
+    $(id).addEventListener('change', function () { markPreset(''); loadOrders(); });
+  });
   $('ordStatus').addEventListener('change', renderOrders);
   $('ordTable').addEventListener('click', function (e) {
     var tr = e.target.closest('tr[data-order]');
@@ -191,12 +214,13 @@
   function openOrder(orderNo) {
     S.open = orderNo;
     $('orderModal').hidden = false;
+    U.lockScroll(true);
     refreshOpen();
   }
 
   function refreshOpen() {
     var o = S.orders.filter(function (x) { return x.orderNo === S.open; })[0];
-    if (!o) { $('orderModal').hidden = true; S.open = null; return; }
+    if (!o) { $('orderModal').hidden = true; U.lockScroll(false); S.open = null; return; }
 
     $('omTitle').textContent = '訂單 ' + o.orderNo;
     $('omState').innerHTML = stateTag(o);
@@ -229,7 +253,7 @@
     $('omCal').textContent = inCalendar(o) ? '移出 Google 日曆' : '加入 Google 日曆';
   }
 
-  function closeOrder() { $('orderModal').hidden = true; S.open = null; }
+  function closeOrder() { $('orderModal').hidden = true; U.lockScroll(false); S.open = null; }
   $('omClose').addEventListener('click', closeOrder);
   $('orderModal').addEventListener('click', function (e) { if (e.target === this) closeOrder(); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeOrder(); });
@@ -468,7 +492,7 @@
       $('crmHistory').innerHTML =
         '<div class="card" style="margin-top:16px"><h2>' + U.esc(c.name || phone) + ' 的消費紀錄</h2>' +
         '<p class="hint" style="margin:4px 0 12px">' + U.esc(phone) + '　生日 ' + U.esc(c.birthday || '—') + '　共 ' + (Number(c.visitCount) || 0) + ' 次・累計 ' + U.money(c.totalSpend || 0) + '</p>' +
-        '<div class="table-scroll"><table class="data" style="min-width:520px"><thead><tr><th>訂單編號</th><th>營業日</th><th>車型</th><th>金額</th><th>狀態</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        '<div class="table-scroll"><table class="data cardify t-hist" style="min-width:520px"><thead><tr><th>訂單編號</th><th>營業日</th><th>車型</th><th>金額</th><th>狀態</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
       $('crmHistory').scrollIntoView({ behavior: 'smooth', block: 'start' });
       S.historyOrders = d.orders;
     }).catch(fail);

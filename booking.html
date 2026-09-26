@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F4F1EC">
 <title>線上預約｜沐車所 MUCAR</title>
-<link rel="stylesheet" href="assets/style.css?v=3">
+<link rel="stylesheet" href="assets/style.css?v=4">
 </head>
 <body>
 
@@ -40,12 +40,12 @@
 
     <div class="field">
       <label for="fName">姓名<span class="req">*</span></label>
-      <input id="fName" type="text" autocomplete="name" maxlength="40" placeholder="您的姓名">
+      <input id="fName" type="text" autocomplete="name" enterkeyhint="next" maxlength="40" placeholder="您的姓名">
       <div class="field-err" id="errName" hidden></div>
     </div>
     <div class="field">
       <label for="fPhone">聯絡電話<span class="req">*</span></label>
-      <input id="fPhone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="14" placeholder="0912345678">
+      <input id="fPhone" type="tel" inputmode="numeric" autocomplete="tel" enterkeyhint="next" maxlength="14" placeholder="0912345678">
       <div class="field-err" id="errPhone" hidden></div>
       <div class="hint">之後查詢或取消預約時，需要用這支電話。</div>
     </div>
@@ -56,7 +56,7 @@
       </div>
       <div class="field">
         <label for="fLine">LINE 帳號</label>
-        <input id="fLine" type="text" maxlength="60" placeholder="選填">
+        <input id="fLine" type="text" maxlength="60" placeholder="選填" autocapitalize="none" autocorrect="off" spellcheck="false">
       </div>
     </div>
     <div class="field">
@@ -78,9 +78,14 @@
 
     <div id="vehForm" hidden>
       <div class="field">
+        <label for="fVehicleSearch">搜尋車種</label>
+        <input id="fVehicleSearch" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="none" placeholder="輸入廠牌或型號，例如 Vios、BMW">
+        <div class="veh-count" id="vehCount" aria-live="polite"></div>
+      </div>
+      <div class="field">
         <label for="fVehicle">車種<span class="req">*</span></label>
         <select id="fVehicle"></select>
-        <div class="hint">依廠牌分類，可直接輸入文字快速找到；找不到請選最下方「找不到我的車 / 其他」。</div>
+        <div class="hint">依廠牌分類；找不到請選最下方「找不到我的車 / 其他」。</div>
       </div>
 
       <div class="field" id="otherField" hidden>
@@ -120,8 +125,9 @@
         <div class="map-frame">
           <div class="map-empty" id="mapEmpty">輸入地址後，這裡會顯示地圖位置</div>
           <iframe id="mapIframe" title="牽車地點地圖" loading="lazy" referrerpolicy="no-referrer-when-downgrade" hidden></iframe>
+          <button type="button" class="map-lock" id="mapLock" hidden>點一下開始操作地圖</button>
         </div>
-        <a id="mapLink" class="hint" href="#" target="_blank" rel="noopener" hidden>在 Google 地圖開啟，確認位置 &rarr;</a>
+        <a id="mapLink" class="btn btn-secondary btn-sm" href="#" target="_blank" rel="noopener" hidden>在 Google 地圖開啟，確認位置</a>
       </div>
     </div>
 
@@ -179,7 +185,7 @@
       </div>
     </details>
 
-    <label class="agree">
+    <label class="agree" id="agreeBox">
       <input type="checkbox" id="fAgree">
       <span>我已閱讀並同意上述服務須知與代客牽車注意事項，並了解牽車費用將依實際距離評估、由店家確認後通知。</span>
     </label>
@@ -234,10 +240,10 @@
   </div>
 </div>
 
-<script src="assets/config.js?v=3"></script>
-<script src="assets/util.js?v=3"></script>
-<script src="assets/api.js?v=3"></script>
-<script src="assets/content.js?v=3"></script>
-<script src="assets/booking.js?v=3"></script>
+<script src="assets/config.js?v=4"></script>
+<script src="assets/util.js?v=4"></script>
+<script src="assets/api.js?v=4"></script>
+<script src="assets/content.js?v=4"></script>
+<script src="assets/booking.js?v=4"></script>
 </body>
 </html>

@@ -15,8 +15,9 @@
     vehicle: null,          // 車種物件，或 { id: 'OTHER' }
     otherTier: '',          // 「找不到我的車」時客人自選的車型級距 id（空 = 由店家判斷）
     day: '', slot: null, avail: null, availSeq: 0,
-    payment: '', order: null
+    payment: '', order: null, mapActive: false, draftVehicle: ''
   };
+  var DRAFT_KEY = 'mucar_booking_draft';
 
   /* ---------------- 共用 ---------------- */
 
@@ -88,7 +89,11 @@
 
   var LABELS = { 1: '下一步', 2: '下一步', 3: '下一步', 4: '下一步', 5: '送出預約' };
 
-  function go(n) {
+  /**
+   * mode: 'pop' = 瀏覽器上一頁/下一頁觸發（不動歷史）、'init' = 第一次載入、'replace' = 用目前這一筆歷史取代（頁面內的「上一步」與錯誤後重選用，
+   * 避免歷史越堆越多）；預設會新增一筆歷史，讓手機的「返回鍵」回到上一步而不是直接離開頁面。
+   */
+  function go(n, mode) {
     S.step = n;
     for (var i = 1; i <= 5; i++) $('step' + i).hidden = (i !== n);
     $('stepDone').hidden = true;
@@ -99,7 +104,7 @@
     });
     $('btnBack').hidden = (n === 1);
     $('btnNext').textContent = LABELS[n];
-    $('btnNext').disabled = (n === 5 && !$('fAgree').checked);
+    $('btnNext').disabled = false;
     clearError();
     renderSummary();
     if (n === 3 && !S.day) selectDay(U.serviceToday());
@@ -107,6 +112,12 @@
     if (n === 4) prepPayment();
     if (n === 5) renderReview();
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (mode === 'init' || mode === 'replace') history.replaceState({ step: n }, '', location.pathname + location.search);
+    else if (mode !== 'pop') history.pushState({ step: n }, '', location.pathname + location.search);
+
+    var h = $('step' + n).querySelector('h2');           // 讓鍵盤/讀屏使用者的焦點跟著換頁
+    if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
   }
 
   function renderSummary() {
@@ -165,8 +176,16 @@
   }
 
   function renderVehicles() {
+    var kw = ($('fVehicleSearch').value || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+    var keep = $('fVehicle').value;
+    var list = S.types.filter(function (v) {
+      var hay = (v.brand + ' ' + v.model).toLowerCase();
+      return kw.every(function (k) { return hay.indexOf(k) >= 0; });
+    });
+    $('vehCount').textContent = kw.length ? (list.length ? '找到 ' + list.length + ' 款' : '沒有符合的車種，可以選最下方「找不到我的車 / 其他」') : '';
+
     var byBrand = {};
-    S.types.forEach(function (v) { (byBrand[v.brand] = byBrand[v.brand] || []).push(v); });
+    list.forEach(function (v) { (byBrand[v.brand] = byBrand[v.brand] || []).push(v); });
     var brands = Object.keys(byBrand).sort(function (a, b) { return a.localeCompare(b, 'en'); });
 
     var html = '<option value="">請選擇車種</option>';
@@ -178,7 +197,11 @@
     });
     html += '<option value="' + OTHER + '">找不到我的車 / 其他</option>';
     $('fVehicle').innerHTML = html;
-    onVehicleChange();
+
+    // 篩選後如果原本選的車種還在，就保留；不在了才清掉
+    var still = keep && [].some.call($('fVehicle').options, function (o) { return o.value === keep; });
+    if (still) $('fVehicle').value = keep;
+    else onVehicleChange();
   }
 
   /** 車型（級距）欄位：一般情況自動帶入且不能改；只有「找不到我的車」才開放自行選擇 */
@@ -201,6 +224,7 @@
   }
 
   function onVehicleChange() {
+    saveDraft();
     var id = $('fVehicle').value;
     S.otherTier = '';
     mark('fVehicle', false); mark('fTier', false); mark('fOther', false);
@@ -260,6 +284,7 @@
       frame.hidden = true;
       $('mapEmpty').hidden = false;
       $('mapLink').hidden = true;
+      $('mapLock').hidden = true;
       mapShown = '';
       return;
     }
@@ -270,14 +295,17 @@
     $('mapEmpty').hidden = true;
     $('mapLink').href = U.mapUrl(addr);
     $('mapLink').hidden = false;
+    $('mapLock').hidden = false;
   }
 
   function renderDates() {
     var today = U.serviceToday();
+    var n = U.taipeiNow();
+    var lateNight = today !== (n.y + '-' + U.pad2(n.M) + '-' + U.pad2(n.d));   // 凌晨 0–3 點仍算前一個營業日
     var html = '';
     for (var i = 0; i < DAYS_AHEAD; i++) {
       var d = U.addDays(today, i);
-      var sub = i === 0 ? '今天' : (i === 1 ? '明天' : U.weekday(d));
+      var sub = i === 0 ? (lateNight ? '營業中' : '今天') : (i === 1 ? '明天' : U.weekday(d));
       var md = new Date(U.wallMs(d));
       html += '<button type="button" class="date-chip' + (d === S.day ? ' selected' : '') + '" data-day="' + d + '">' +
         '<small>' + sub + '</small><b>' + (md.getUTCMonth() + 1) + '/' + md.getUTCDate() + '</b></button>';
@@ -473,7 +501,14 @@
   }
 
   function submit() {
-    if (!$('fAgree').checked) return showError('請先勾選同意服務須知');
+    if (!$('fAgree').checked) {
+      var box = $('agreeBox');
+      box.classList.remove('attn'); void box.offsetWidth; box.classList.add('attn');
+      box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      showError('請先勾選下方「我已閱讀並同意服務須知」，才能送出預約。');
+      $('fAgree').focus({ preventScroll: true });
+      return;
+    }
     setBusy(true);
     clearError();
     var data = payload();
@@ -482,13 +517,13 @@
       if (res.hasActive) {
         $('dupText').textContent = '電話 ' + data.phone + ' 目前已有 ' + res.orders.length + ' 筆進行中的預約，確定還要再預約一筆嗎？';
         $('dupModal').hidden = false;
+        U.lockScroll(true);
         $('dupConfirm').focus();
         return null;
       }
       return create(data);
     }).catch(function (err) {
       setBusy(false);
-      $('btnNext').disabled = !$('fAgree').checked;
       showError(err.message);
     });
   }
@@ -499,9 +534,8 @@
       showDone(order);
     }).catch(function (err) {
       setBusy(false);
-      $('btnNext').disabled = !$('fAgree').checked;
       if (/時段|已被預約|已經過了|可預約範圍/.test(err.message)) {
-        go(3);
+        go(3, 'replace');
         selectDay(S.day);
         showError(err.message + '（請重新選擇時段）');
       } else {
@@ -520,6 +554,8 @@
     Array.prototype.forEach.call(document.querySelectorAll('#stepper li'), function (li) { li.className = 'done'; });
     clearError();
 
+    try { sessionStorage.removeItem(DRAFT_KEY); } catch (e) { /* ignore */ }
+    history.replaceState({ done: true }, '', location.pathname + location.search);
     $('doneOrderNo').textContent = o.orderNo;
     $('lineLink').href = CFG.LINE_OA_URL;
 
@@ -564,12 +600,51 @@
     else if (n === 4 && validateStep4()) go(5);
     else if (n === 5) submit();
   });
-  $('btnBack').addEventListener('click', function () { if (S.step > 1) go(S.step - 1); });
+  $('btnBack').addEventListener('click', function () { if (S.step > 1) go(S.step - 1, 'replace'); });
 
   $('fVehicle').addEventListener('change', onVehicleChange);
   $('fTier').addEventListener('change', onTierChange);
   $('fOther').addEventListener('input', function () { mark('fOther', false); });
   $('vehRetry').addEventListener('click', loadVehicles);
+  $('fVehicleSearch').addEventListener('input', renderVehicles);
+  $('fVehicleSearch').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); this.blur(); } });
+
+  $('mapLock').addEventListener('click', function () {
+    S.mapActive = !S.mapActive;
+    document.querySelector('.map-frame').classList.toggle('active', S.mapActive);
+    this.textContent = S.mapActive ? '完成，繼續捲動頁面' : '點一下開始操作地圖';
+  });
+
+  /* 瀏覽器 / 手機的「上一頁」：回到上一步，不是直接離開；送出成功後不能倒回去重送 */
+  window.addEventListener('popstate', function (e) {
+    if (S.order) return;   // 已經送出：留在完成頁，不能倒回去重送；也不再新增歷史，不會卡住返回鍵
+    var st = e.state && e.state.step;
+    go(st || 1, 'pop');
+  });
+
+  /* 草稿：手機切去別的 App 再回來、或頁面被重新整理時，已填的資料還在（只存在這個分頁，關掉就清空） */
+  function saveDraft() {
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+        name: $('fName').value, phone: $('fPhone').value, birthday: $('fBirthday').value, line: $('fLine').value,
+        note: $('fNote').value, address: $('fAddress').value, other: $('fOther').value, vehicle: $('fVehicle').value
+      }));
+    } catch (e) { /* 無痕模式等 */ }
+  }
+  function restoreDraft() {
+    try {
+      var d = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || 'null');
+      if (!d) return;
+      $('fName').value = d.name || ''; $('fPhone').value = d.phone || ''; $('fBirthday').value = d.birthday || '';
+      $('fLine').value = d.line || ''; $('fNote').value = d.note || ''; $('fAddress').value = d.address || ''; $('fOther').value = d.other || '';
+      S.draftVehicle = d.vehicle || '';
+    } catch (e) { /* ignore */ }
+  }
+  ['fName', 'fPhone', 'fBirthday', 'fLine', 'fNote', 'fAddress', 'fOther'].forEach(function (id) {
+    $(id).addEventListener('input', saveDraft);
+    $(id).addEventListener('change', saveDraft);
+  });
+  $('fVehicle').addEventListener('change', saveDraft);
 
   $('fAddress').addEventListener('input', function () {
     clearTimeout(mapTimer);
@@ -589,7 +664,10 @@
   Array.prototype.forEach.call(document.querySelectorAll('input[name="payment"]'), function (r) {
     r.addEventListener('change', onPayChange);
   });
-  $('fAgree').addEventListener('change', function () { $('btnNext').disabled = !this.checked; });
+  $('fAgree').addEventListener('change', function () {
+    $('agreeBox').classList.remove('attn');
+    if (this.checked) clearError();
+  });
 
   $('copyBank').addEventListener('click', function () {
     U.copyText(CFG.BANK_ACCOUNT.replace(/\D/g, '')).then(function () { U.toast('帳號已複製'); }, function () { U.toast('複製失敗，請手動選取', 'error'); });
@@ -600,11 +678,12 @@
 
   $('dupCancel').addEventListener('click', function () {
     $('dupModal').hidden = true;
+    U.lockScroll(false);
     setBusy(false);
-    $('btnNext').disabled = !$('fAgree').checked;
   });
   $('dupConfirm').addEventListener('click', function () {
     $('dupModal').hidden = true;
+    U.lockScroll(false);
     create(payload());
   });
   document.addEventListener('keydown', function (e) {
@@ -615,7 +694,12 @@
 
   MUCAR_CONTENT.renderFlow($('noticeFlow'));
   MUCAR_CONTENT.renderTips($('noticeTips'));
+  restoreDraft();
   renderDates();
-  go(1);
-  loadVehicles();
+  go(1, 'init');
+  loadVehicles().then(function () {
+    if (!S.draftVehicle || !S.loaded) return;
+    var ok = [].some.call($('fVehicle').options, function (o) { return o.value === S.draftVehicle; });
+    if (ok) { $('fVehicle').value = S.draftVehicle; onVehicleChange(); }
+  });
 })();

@@ -109,6 +109,11 @@
     });
   }
 
+  /** 跳出視窗時鎖住背景捲動（手機上避免捲到後面的頁面） */
+  function lockScroll(on) {
+    document.documentElement.classList.toggle('no-scroll', !!on);
+  }
+
   var toastTimer = null;
   function toast(msg, type) {
     var t = document.getElementById('toast');
@@ -127,6 +132,6 @@
   global.U = {
     esc: esc, pad2: pad2, taipeiNow: taipeiNow, nowStr: nowStr, wallMs: wallMs, msToStr: msToStr, hm: hm,
     addDays: addDays, serviceToday: serviceToday, dayLabel: dayLabel, weekday: weekday, money: money,
-    isTrue: isTrue, mapUrl: mapUrl, orderState: orderState, copyText: copyText, toast: toast
+    isTrue: isTrue, mapUrl: mapUrl, orderState: orderState, copyText: copyText, toast: toast, lockScroll: lockScroll
   };
 })(window);

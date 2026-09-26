@@ -73,22 +73,24 @@
     if (e.target.id !== 'cancelBtn' || !current) return;
     $('cancelText').textContent = '訂單 ' + current.orderNo + '（' + current.startAt.slice(0, 16) + '）。取消後這個時段會釋放給其他人預約。';
     $('cancelModal').hidden = false;
+    U.lockScroll(true);
   });
-  $('cancelNo').addEventListener('click', function () { $('cancelModal').hidden = true; });
+  function closeCancel() { $('cancelModal').hidden = true; U.lockScroll(false); }
+  $('cancelNo').addEventListener('click', closeCancel);
   $('cancelYes').addEventListener('click', function () {
     var btn = $('cancelYes');
     btn.disabled = true;
     Api.call('cancelOrder', { phone: current.phone, orderNo: current.orderNo }).then(function () {
-      $('cancelModal').hidden = true;
+      closeCancel();
       current.status = 'CANCELLED';
       render(current);
       U.toast('預約已取消');
     }).catch(function (err) {
-      $('cancelModal').hidden = true;
+      closeCancel();
       showError(err.message);
     }).then(function () { btn.disabled = false; });
   });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') $('cancelModal').hidden = true;
+    if (e.key === 'Escape' && !$('cancelModal').hidden) closeCancel();
   });
 })();
