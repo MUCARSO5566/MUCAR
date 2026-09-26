@@ -7,8 +7,8 @@
   function safeGet() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
   function safeSet(v) { try { v ? localStorage.setItem(KEY_STORE, v) : localStorage.removeItem(KEY_STORE); } catch (e) { /* 無痕模式等 */ } }
 
-  var REQUIRED_BACKEND = 6;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
-  var S = { orders: [], tiers: [], types: [], customers: [], open: null, closures: [] };
+  var REQUIRED_BACKEND = 7;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
+  var S = { calMode: 'auto', orders: [], tiers: [], types: [], customers: [], open: null, closures: [] };
 
   /* ---------------- 呼叫後端（密碼失效時自動回登入畫面） ---------------- */
 
@@ -164,6 +164,16 @@
     $('ordTable').hidden = rows.length === 0;
   }
 
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="calMode"]'), function (r) {
+    r.addEventListener('change', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('input[name="calMode"]'), function (x) {
+        x.closest('label').classList.toggle('selected', x.checked);
+      });
+    });
+  });
+
+  function inCalendar(o) { var id = String(o.calendarEventId || ''); return id !== '' && id !== 'SKIP'; }
+
   Array.prototype.forEach.call(document.querySelectorAll('[data-preset]'), function (b) {
     b.addEventListener('click', function () { setPreset(b.dataset.preset); });
   });
@@ -201,6 +211,7 @@
         ? '匯款<br><span class="hint">' + (U.isTrue(o.verified) ? '已核對（款項已確認）' : '未核對（等客人在官方 LINE 提供截圖與末五碼）') + '</span>'
         : '現場付款') +
       kv('客人備註', U.esc(o.note || '—').replace(/\n/g, '<br>')) +
+      kv('Google 日曆', S.calMode === 'off' ? '<span class="hint">日曆功能已關閉</span>' : (inCalendar(o) ? '已加入「沐車所預約」日曆' : '未加入')) +
       kv('建立時間', U.esc(o.createdAt)) +
       (o.status !== 'ACTIVE' ? kv('取消', U.esc((o.cancelledBy === 'admin' ? '店家' : '客人') + ' · ' + o.cancelledAt + (o.cancelReason ? ' · ' + o.cancelReason : ''))) : '');
 
@@ -214,6 +225,8 @@
     $('omCancel').hidden = !active;
     $('omVerify').hidden = !(active && o.paymentMethod === 'transfer');
     $('omVerify').textContent = U.isTrue(o.verified) ? '改回未核對' : '標記為已核對';
+    $('omCal').hidden = !(active && S.calMode !== 'off');
+    $('omCal').textContent = inCalendar(o) ? '移出 Google 日曆' : '加入 Google 日曆';
   }
 
   function closeOrder() { $('orderModal').hidden = true; S.open = null; }
@@ -235,6 +248,17 @@
 
   $('omVerify').addEventListener('click', function () {
     call('toggleVerified', { orderNo: S.open }).then(function () { U.toast('已更新核對狀態'); return loadOrders(); }).catch(fail);
+  });
+
+  $('omCal').addEventListener('click', function () {
+    var o = S.orders.filter(function (x) { return x.orderNo === S.open; })[0];
+    if (!o) return;
+    var add = !inCalendar(o);
+    $('omCal').disabled = true;
+    call('setOrderCalendar', { orderNo: S.open, on: add }).then(function () {
+      U.toast(add ? '已加入 Google 日曆' : '已從 Google 日曆移出');
+      return loadOrders();
+    }).catch(fail).then(function () { $('omCal').disabled = false; });
   });
 
   $('omCancel').addEventListener('click', function () {
@@ -464,13 +488,17 @@
 
   function showNotify(st) {
     $('ntMailOn').checked = !!st.notifyEnabled;
-    $('ntCalOn').checked = !!st.calendarEnabled;
+    S.calMode = st.calendarMode || (st.calendarEnabled ? 'auto' : 'off');
+    Array.prototype.forEach.call(document.querySelectorAll('input[name="calMode"]'), function (r) {
+      r.checked = (r.value === S.calMode);
+      r.closest('label').classList.toggle('selected', r.checked);
+    });
     $('ntEmails').value = (st.emails || []).join('\n');
     $('ntSender').textContent = st.sender || '（部署 Apps Script 的 Google 帳號）';
     $('ntSenderName').textContent = st.senderName || '';
     $('ntQuota').textContent = st.quota == null ? '—' : st.quota + ' 封';
     $('ntCalName').textContent = st.calendarName || '沐車所預約';
-    $('ntCalState').textContent = st.calendarReady ? '已建立，運作中' : '尚未建立（收到第一筆預約或按「測試日曆行程」時會自動建立）';
+    $('ntCalState').textContent = st.calendarReady ? '已建立，運作中' : '尚未建立（收到第一筆預約或按「測試日曆連線」時會自動建立）';
     var le = $('ntLastError');
     if (st.lastError) {
       le.innerHTML = '<b>上一次通知失敗</b>（' + U.esc(st.lastError.at) + '）：' + U.esc(st.lastError.msg);
@@ -494,8 +522,8 @@
     call('saveNotifySettings', {
       emails: $('ntEmails').value,
       notifyEnabled: $('ntMailOn').checked,
-      calendarEnabled: $('ntCalOn').checked
-    }).then(function (st) { showNotify(st); U.toast('通知設定已儲存'); })
+      calendarMode: (document.querySelector('input[name="calMode"]:checked') || {}).value || 'auto'
+    }).then(function (st) { showNotify(st); U.toast('通知設定已儲存'); if (S.open) refreshOpen(); })
       .catch(function (err) { $('ntError').textContent = err.message; $('ntError').hidden = false; })
       .then(function () { $('ntSave').disabled = false; });
   });
@@ -515,7 +543,7 @@
     runTest(this, 'email', function (r) { return '測試信已寄出（' + r.sent + ' 個信箱），請查看收件匣'; });
   });
   $('ntTestCal').addEventListener('click', function () {
-    runTest(this, 'calendar', '日曆連線正常：測試行程已建立並刪除');
+    runTest(this, 'calendar', '日曆連線正常：測試行程已建立並立刻刪除');
   });
 
   /* ============================================================
