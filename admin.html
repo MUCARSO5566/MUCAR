@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>後台管理</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">後台管理</div>
+  <button class="btn-ghost" id="logoutBtn" hidden>登出</button>
+</div>
+
+<div id="loginMask" class="wrap">
+  <div class="card">
+    <h2>後台登入</h2>
+    <label>管理密碼</label>
+    <input id="loginPwd" type="password">
+    <div id="loginError" class="error-box" hidden></div>
+    <div class="btn-row"><button class="btn-primary" id="loginBtn">登入</button></div>
+  </div>
+</div>
+
+<div id="adminArea" class="wrap" hidden>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="orders">訂單管理</button>
+    <button class="tab-btn" data-tab="slots">時段設定</button>
+    <button class="tab-btn" data-tab="vehicles">車型計價</button>
+    <button class="tab-btn" data-tab="crm">客戶 CRM</button>
+  </div>
+
+  <section id="tab-orders" class="tab-panel">
+    <div class="card">
+      <h2>訂單管理</h2>
+      <div class="form-row">
+        <div><label>起</label><input id="ordFrom" type="date"></div>
+        <div><label>迄</label><input id="ordTo" type="date"></div>
+        <div style="display:flex;align-items:flex-end;"><button class="btn-secondary" id="ordSearch">查詢</button></div>
+      </div>
+      <div id="ordError" class="error-box" hidden></div>
+      <div class="table-scroll">
+        <table id="ordTable">
+          <thead><tr>
+            <th>訂單編號</th><th>服務日</th><th>時段</th><th>客人</th><th>電話</th>
+            <th>車輛</th><th>金額</th><th>付款</th><th>核對</th><th>狀態</th><th></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-slots" class="tab-panel" hidden>
+    <div class="card">
+      <h2>預約時段長度</h2>
+      <p class="hint">每筆預約會佔用這麼長的時間，其他人在這段時間內無法預約。</p>
+      <label>時段長度</label>
+      <select id="windowHoursSel">
+        <option value="2">2 小時</option>
+        <option value="3">3 小時</option>
+      </select>
+      <div class="btn-row"><button class="btn-secondary" id="saveWindowHours">儲存</button></div>
+    </div>
+
+    <div class="card">
+      <h2>公休 / 關閉時段</h2>
+      <div class="form-row">
+        <div><label>日期</label><input id="cloDate" type="date"></div>
+        <div>
+          <label>&nbsp;</label>
+          <label style="display:flex;align-items:center;gap:6px;"><input id="cloAllDay" type="checkbox" style="width:auto;"> 關閉整天</label>
+        </div>
+      </div>
+      <div class="form-row" id="cloRangeFields">
+        <div><label>關閉起</label><input id="cloStart" type="time"></div>
+        <div><label>關閉迄</label><input id="cloEnd" type="time"></div>
+      </div>
+      <label>原因</label>
+      <input id="cloReason" type="text" placeholder="選填">
+      <div class="btn-row"><button class="btn-secondary" id="cloAdd">新增關閉</button></div>
+      <div id="cloError" class="error-box" hidden></div>
+      <div class="table-scroll">
+        <table id="cloTable">
+          <thead><tr><th>日期</th><th>範圍</th><th>原因</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-vehicles" class="tab-panel" hidden>
+    <div class="card">
+      <h2>車型級距價格</h2>
+      <div class="table-scroll">
+        <table id="tierTable">
+          <thead><tr><th>級距</th><th>價格</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>廠牌 / 車型對照</h2>
+      <input id="vehFilter" type="text" placeholder="搜尋廠牌或型號...">
+      <h3 style="margin-top:18px;">新增車型</h3>
+      <div class="form-row">
+        <div><label>廠牌</label><input id="newBrand" type="text"></div>
+        <div><label>型號</label><input id="newModel" type="text"></div>
+        <div><label>級距</label><select id="newTier"></select></div>
+        <div style="display:flex;align-items:flex-end;"><button class="btn-secondary" id="vehAdd">新增</button></div>
+      </div>
+      <div id="vehError" class="error-box" hidden></div>
+      <div class="table-scroll">
+        <table id="vehTable">
+          <thead><tr><th>廠牌</th><th>型號</th><th>級距</th><th>啟用</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-crm" class="tab-panel" hidden>
+    <div class="card">
+      <h2>客戶 CRM</h2>
+      <input id="crmSearch" type="text" placeholder="搜尋電話或姓名...">
+      <div class="table-scroll">
+        <table id="crmTable">
+          <thead><tr><th>電話</th><th>姓名</th><th>次數</th><th>總消費</th><th>最近到店</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="crmHistory"></div>
+  </section>
+
+</div>
+
+<script src="assets/config.js"></script>
+<script src="assets/api.js"></script>
+<script src="assets/admin.js"></script>
+</body>
+</html>

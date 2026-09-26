@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>線上預約</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">線上預約洗車</div>
+  <a href="index.html" class="hint">回首頁</a>
+</div>
+
+<div class="wrap">
+
+  <div class="steps">
+    <div class="step-dot active" data-step="1">基本資料</div>
+    <div class="step-dot" data-step="2">選車</div>
+    <div class="step-dot" data-step="3">時段</div>
+    <div class="step-dot" data-step="4">付款</div>
+    <div class="step-dot" data-step="5">完成</div>
+  </div>
+
+  <div id="errorBox" class="error-box" hidden></div>
+
+  <section id="step1" class="card">
+    <h2>基本資料</h2>
+    <label>姓名 *</label>
+    <input id="fName" type="text" placeholder="您的姓名">
+    <label>生日</label>
+    <input id="fBirthday" type="date">
+    <label>聯絡電話 *</label>
+    <input id="fPhone" type="tel" inputmode="numeric" placeholder="0912345678">
+    <label>LINE 帳號</label>
+    <input id="fLine" type="text" placeholder="選填">
+    <label>備註</label>
+    <textarea id="fNote" placeholder="選填"></textarea>
+    <div class="btn-row"><button class="btn-primary" id="toStep2">下一步</button></div>
+  </section>
+
+  <section id="step2" class="card" hidden>
+    <h2>選擇車輛</h2>
+    <label>廠牌 / 車型 *</label>
+    <select id="fVehicle"><option value="">請選擇...</option></select>
+    <div id="vehiclePreview" class="hint"></div>
+    <div class="btn-row">
+      <button class="btn-secondary" id="back2">上一步</button>
+      <button class="btn-primary" id="toStep3">下一步</button>
+    </div>
+  </section>
+
+  <section id="step3" class="card" hidden>
+    <h2>選擇預約時段</h2>
+    <p class="hint">營業時間 12:00 – 凌晨 03:00，每筆預約會佔用一段時間，請選擇一個起始時間。</p>
+    <label>預約日期 *</label>
+    <input id="fDate" type="date">
+    <div id="slotArea"></div>
+    <div class="btn-row">
+      <button class="btn-secondary" id="back3">上一步</button>
+      <button class="btn-primary" id="toStep4" disabled>下一步</button>
+    </div>
+  </section>
+
+  <section id="step4" class="card" hidden>
+    <h2>付款方式</h2>
+    <div class="radio-row">
+      <label class="radio-card"><input type="radio" name="payment" value="transfer"> 匯款</label>
+      <label class="radio-card"><input type="radio" name="payment" value="onsite"> 現場付款</label>
+    </div>
+
+    <div id="transferFields" hidden>
+      <p class="hint">請匯款至：<strong id="bankAccountText"></strong></p>
+      <label>匯款日期 *</label>
+      <input id="fTransferDate" type="date">
+      <label>轉出帳號末五碼 *</label>
+      <input id="fLast5" type="text" inputmode="numeric" maxlength="5" placeholder="5 碼數字">
+      <p class="hint">送出後畫面會產生一段通知文字，請複製貼到官方 LINE 給店家核對。</p>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-secondary" id="back4">上一步</button>
+      <button class="btn-primary" id="submitOrder">送出預約</button>
+    </div>
+  </section>
+
+  <section id="step5" class="card" hidden>
+    <h2>預約完成</h2>
+    <div class="success-box">預約已送出！</div>
+    <div id="summaryArea"></div>
+
+    <div id="transferNoticeArea" hidden>
+      <h3>匯款通知（請複製貼到官方 LINE）</h3>
+      <div class="notice-block" id="noticeText"></div>
+      <button class="btn-secondary" id="copyNotice">複製文字</button>
+    </div>
+
+    <div class="btn-row">
+      <a class="btn btn-primary" id="lineLink" href="#" target="_blank">前往官方 LINE</a>
+    </div>
+  </section>
+
+</div>
+
+<div id="dupModal" class="modal-mask" hidden>
+  <div class="modal-box">
+    <h3>您已經有一筆預約</h3>
+    <p id="dupText"></p>
+    <div class="btn-row">
+      <button class="btn-secondary" id="dupCancel">取消</button>
+      <button class="btn-primary" id="dupConfirm">仍要建立新的預約</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/config.js"></script>
+<script src="assets/api.js"></script>
+<script src="assets/booking.js"></script>
+</body>
+</html>

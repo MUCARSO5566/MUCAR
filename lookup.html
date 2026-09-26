@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>查詢 / 取消預約</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">查詢 / 取消預約</div>
+  <a href="index.html" class="hint">回首頁</a>
+</div>
+
+<div class="wrap">
+  <div id="errorBox" class="error-box" hidden></div>
+
+  <section class="card">
+    <h2>查詢我的預約</h2>
+    <label>聯絡電話 *</label>
+    <input id="fPhone" type="tel" inputmode="numeric" placeholder="0912345678">
+    <label>訂單編號 *</label>
+    <input id="fOrderNo" type="text" placeholder="例如 20260926-001">
+    <div class="btn-row"><button class="btn-primary" id="searchBtn">查詢</button></div>
+  </section>
+
+  <div id="resultArea"></div>
+
+  <div class="btn-row">
+    <button class="btn-danger" id="cancelBtn" hidden>取消這筆預約</button>
+  </div>
+</div>
+
+<script src="assets/config.js"></script>
+<script src="assets/api.js"></script>
+<script src="assets/lookup.js"></script>
+</body>
+</html>

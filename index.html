@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>首頁</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand" id="brandText">洗車預約</div>
+</div>
+
+<div class="wrap" style="padding-top:60px;">
+  <div class="card" style="text-align:center;">
+    <h1 id="heroTitle">線上預約洗車</h1>
+    <p>選車型、挑時段、線上預約，到店就能直接洗車。</p>
+    <div class="btn-row" style="flex-direction:column;">
+      <a class="btn btn-primary" href="booking.html">立即預約</a>
+      <a class="btn btn-secondary" href="lookup.html">查詢 / 取消預約</a>
+      <a class="btn btn-ghost" id="lineLink" href="#" target="_blank">加入官方 LINE</a>
+    </div>
+  </div>
+
+  <p class="hint" style="text-align:center;">
+    ※ 這是精簡版首頁，之後可以再補上服務介紹、門市資訊等內容。
+  </p>
+</div>
+
+<script src="assets/config.js"></script>
+<script>
+  document.title = window.CARWASH_CONFIG.SHOP_NAME;
+  document.getElementById('brandText').textContent = window.CARWASH_CONFIG.SHOP_NAME;
+  document.getElementById('heroTitle').textContent = window.CARWASH_CONFIG.SHOP_NAME + ' 線上預約';
+  document.getElementById('lineLink').href = window.CARWASH_CONFIG.LINE_OA_URL;
+</script>
+</body>
+</html>
