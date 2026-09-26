@@ -2,38 +2,120 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>首頁</title>
-<link rel="stylesheet" href="assets/style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="沐車所 MUCAR — 代客牽車、專人接送、進廠施工，線上預約立即保留時段。">
+<meta name="theme-color" content="#F4F1EC">
+<title>沐車所｜MUCAR</title>
+<link rel="stylesheet" href="assets/style.css?v=3">
 </head>
 <body>
 
-<div class="topbar">
-  <div class="brand" id="brandText">洗車預約</div>
-</div>
-
-<div class="wrap" style="padding-top:60px;">
-  <div class="card" style="text-align:center;">
-    <h1 id="heroTitle">線上預約洗車</h1>
-    <p>選車型、挑時段、線上預約，到店就能直接洗車。</p>
-    <div class="btn-row" style="flex-direction:column;">
-      <a class="btn btn-primary" href="booking.html">立即預約</a>
-      <a class="btn btn-secondary" href="lookup.html">查詢 / 取消預約</a>
-      <a class="btn btn-ghost" id="lineLink" href="#" target="_blank">加入官方 LINE</a>
-    </div>
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="index.html"><b>MUCAR</b><span>沐車所</span></a>
+    <nav class="nav">
+      <a class="hide-sm" href="#flow">服務流程</a>
+      <a class="hide-sm" href="#tips">須知</a>
+      <a class="hide-sm" href="lookup.html">查詢預約</a>
+      <a class="cta" href="booking.html">立即預約</a>
+    </nav>
   </div>
+</header>
 
-  <p class="hint" style="text-align:center;">
-    ※ 這是精簡版首頁，之後可以再補上服務介紹、門市資訊等內容。
-  </p>
-</div>
+<section class="hero">
+  <div class="mark">MUCAR</div>
+  <div class="sub">沐 車 所</div>
+  <p class="lead">代客牽車・專人接送・進廠施工<br>不用出門，線上預約時段，愛車煥然一新後送回您手中。</p>
+  <div class="pills">
+    <span class="pill">專員制服出示身份</span>
+    <span class="pill">環車拍照錄影點交</span>
+    <span class="pill">完工成果拍照回報</span>
+  </div>
+  <div class="actions">
+    <a class="btn btn-primary" href="booking.html">立即預約</a>
+    <a class="btn btn-secondary" href="lookup.html">查詢 / 取消預約</a>
+  </div>
+</section>
 
-<script src="assets/config.js"></script>
+<main class="wrap wide" style="padding-bottom:0">
+
+  <section class="section" id="price">
+    <div class="section-head">
+      <div class="eyebrow">Price</div>
+      <h2>服務價目</h2>
+      <p style="margin-top:6px">依車型分級計價；牽車費用依實際距離評估，預約後由店家確認並通知。</p>
+    </div>
+    <div class="price-grid" id="priceGrid">
+      <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+    </div>
+    <p class="hint" id="priceNote" hidden>找不到您的車型？預約時選「找不到我的車 / 其他」，店家會協助確認車型與價格。</p>
+  </section>
+
+  <section class="section" id="flow">
+    <div class="section-head">
+      <div class="eyebrow">Service Flow</div>
+      <h2>服務流程</h2>
+    </div>
+    <ol class="flow" id="flowList"></ol>
+  </section>
+
+  <section class="section" id="tips">
+    <div class="section-head">
+      <div class="eyebrow">Notice</div>
+      <h2>代客牽車注意事項</h2>
+    </div>
+    <div class="tips" id="tipList"></div>
+  </section>
+
+  <section class="section center">
+    <h2>準備好了嗎？</h2>
+    <p style="margin:8px 0 20px">選車型、挑時段，三分鐘完成預約。</p>
+    <div class="btn-row" style="justify-content:center">
+      <a class="btn btn-primary" href="booking.html">立即預約</a>
+      <a class="btn btn-line" id="lineLink" href="#" target="_blank" rel="noopener">加入官方 LINE</a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div>© <span id="year"></span> <span id="shopName">沐車所｜MUCAR</span></div>
+  <div style="margin-top:8px">
+    <a href="lookup.html">查詢 / 取消預約</a>
+    <a class="admin-link" href="admin.html">店家後台</a>
+  </div>
+</footer>
+
+<script src="assets/config.js?v=3"></script>
+<script src="assets/util.js?v=3"></script>
+<script src="assets/api.js?v=3"></script>
+<script src="assets/content.js?v=3"></script>
 <script>
-  document.title = window.CARWASH_CONFIG.SHOP_NAME;
-  document.getElementById('brandText').textContent = window.CARWASH_CONFIG.SHOP_NAME;
-  document.getElementById('heroTitle').textContent = window.CARWASH_CONFIG.SHOP_NAME + ' 線上預約';
-  document.getElementById('lineLink').href = window.CARWASH_CONFIG.LINE_OA_URL;
+(function () {
+  var CFG = window.CARWASH_CONFIG;
+  document.getElementById('year').textContent = new Date().getFullYear();
+  document.getElementById('lineLink').href = CFG.LINE_OA_URL;
+  MUCAR_CONTENT.renderFlow(document.getElementById('flowList'));
+  MUCAR_CONTENT.renderTips(document.getElementById('tipList'));
+
+  var grid = document.getElementById('priceGrid');
+  function hidePrice() { document.getElementById('price').hidden = true; }
+
+  if (Api.configProblem()) return hidePrice();
+
+  Api.call('bootBooking', {}).then(function (data) {
+    var tiers = data.tiers || [], types = data.vehicleTypes || [];
+    if (!tiers.length) return hidePrice();
+    grid.innerHTML = tiers.map(function (t) {
+      var eg = types.filter(function (v) { return String(v.tierId) === String(t.id); }).slice(0, 4)
+        .map(function (v) { return U.esc(v.brand + ' ' + v.model); }).join('、');
+      return '<div class="price-card"><div class="tier">' + U.esc(t.name) + '</div>' +
+        '<div class="amt">' + U.money(t.price) + '<small>起</small></div>' +
+        '<div class="eg">' + (eg ? '例：' + eg + ' …' : '') + '</div></div>';
+    }).join('');
+    document.getElementById('priceNote').hidden = false;
+  }).catch(hidePrice);
+})();
 </script>
 </body>
 </html>

@@ -1,0 +1,5 @@
+# Code.gs 是貼進 Apps Script 用的，裡面會放後台密碼，不要上傳到公開 repo
+Code.gs
+.claude/
+.DS_Store
+Thumbs.db

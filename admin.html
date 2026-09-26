@@ -2,101 +2,141 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>後台管理</title>
-<link rel="stylesheet" href="assets/style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#F4F1EC">
+<title>店家後台｜沐車所 MUCAR</title>
+<link rel="stylesheet" href="assets/style.css?v=3">
 </head>
 <body>
 
-<div class="topbar">
-  <div class="brand">後台管理</div>
-  <button class="btn-ghost" id="logoutBtn" hidden>登出</button>
-</div>
-
-<div id="loginMask" class="wrap">
-  <div class="card">
-    <h2>後台登入</h2>
-    <label>管理密碼</label>
-    <input id="loginPwd" type="password">
-    <div id="loginError" class="error-box" hidden></div>
-    <div class="btn-row"><button class="btn-primary" id="loginBtn">登入</button></div>
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="admin.html"><b>MUCAR</b><span>店家後台</span></a>
+    <nav class="nav">
+      <a class="hide-sm" href="index.html" target="_blank" rel="noopener">前台首頁</a>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button" hidden>登出</button>
+    </nav>
   </div>
-</div>
+</header>
 
-<div id="adminArea" class="wrap" hidden>
+<!-- 登入 -->
+<main id="loginMask" class="wrap" style="padding-top:48px">
+  <section class="panel">
+    <h2>店家後台登入</h2>
+    <p class="desc">請輸入管理密碼（設定在 Code.gs 的 ADMIN_KEY）。</p>
+    <div id="loginConfig" class="alert alert-danger" hidden></div>
+    <div id="loginError" class="alert alert-danger" role="alert" hidden></div>
+    <form id="loginForm" autocomplete="off">
+      <div class="field">
+        <label for="loginPwd">管理密碼</label>
+        <input id="loginPwd" type="password" autocomplete="current-password">
+      </div>
+      <div class="btn-row" style="margin-top:18px">
+        <button class="btn btn-primary btn-block" id="loginBtn" type="submit">登入</button>
+      </div>
+    </form>
+  </section>
+</main>
 
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="orders">訂單管理</button>
-    <button class="tab-btn" data-tab="slots">時段設定</button>
-    <button class="tab-btn" data-tab="vehicles">車型計價</button>
-    <button class="tab-btn" data-tab="crm">客戶 CRM</button>
+<!-- 後台主畫面 -->
+<main id="adminArea" class="wrap wide" style="padding-bottom:60px" hidden>
+
+  <div class="tabs" role="tablist">
+    <button class="tab-btn active" data-tab="orders" type="button">預約訂單</button>
+    <button class="tab-btn" data-tab="slots" type="button">時段設定</button>
+    <button class="tab-btn" data-tab="vehicles" type="button">車型計價</button>
+    <button class="tab-btn" data-tab="crm" type="button">客戶 CRM</button>
   </div>
 
+  <!-- 訂單 -->
   <section id="tab-orders" class="tab-panel">
     <div class="card">
-      <h2>訂單管理</h2>
-      <div class="form-row">
-        <div><label>起</label><input id="ordFrom" type="date"></div>
-        <div><label>迄</label><input id="ordTo" type="date"></div>
-        <div style="display:flex;align-items:flex-end;"><button class="btn-secondary" id="ordSearch">查詢</button></div>
+      <div class="toolbar">
+        <div class="presets">
+          <button class="btn btn-secondary btn-sm" data-preset="today" type="button">今天</button>
+          <button class="btn btn-secondary btn-sm" data-preset="tomorrow" type="button">明天</button>
+          <button class="btn btn-secondary btn-sm" data-preset="week" type="button">未來 7 天</button>
+          <button class="btn btn-secondary btn-sm" data-preset="all" type="button">全部</button>
+        </div>
       </div>
-      <div id="ordError" class="error-box" hidden></div>
+      <div class="toolbar">
+        <div class="field"><label for="ordFrom">起（營業日）</label><input id="ordFrom" type="date"></div>
+        <div class="field"><label for="ordTo">迄</label><input id="ordTo" type="date"></div>
+        <div class="field">
+          <label for="ordStatus">狀態</label>
+          <select id="ordStatus">
+            <option value="">全部</option>
+            <option value="ACTIVE">預約中</option>
+            <option value="DONE">已完成</option>
+            <option value="CANCELLED">已取消</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" id="ordSearch" type="button">查詢</button>
+      </div>
+      <div id="ordError" class="alert alert-danger" hidden></div>
+      <div class="stats" id="ordStats"></div>
       <div class="table-scroll">
-        <table id="ordTable">
+        <table class="data" id="ordTable">
           <thead><tr>
-            <th>訂單編號</th><th>服務日</th><th>時段</th><th>客人</th><th>電話</th>
-            <th>車輛</th><th>金額</th><th>付款</th><th>核對</th><th>狀態</th><th></th>
+            <th>時段</th><th>客人</th><th>車型</th><th>金額</th><th>付款</th><th>核對</th><th>狀態</th>
           </tr></thead>
           <tbody></tbody>
         </table>
       </div>
+      <div class="empty" id="ordEmpty" hidden>這段期間沒有預約。</div>
     </div>
   </section>
 
+  <!-- 時段 -->
   <section id="tab-slots" class="tab-panel" hidden>
     <div class="card">
       <h2>預約時段長度</h2>
-      <p class="hint">每筆預約會佔用這麼長的時間，其他人在這段時間內無法預約。</p>
-      <label>時段長度</label>
-      <select id="windowHoursSel">
-        <option value="2">2 小時</option>
-        <option value="3">3 小時</option>
-      </select>
-      <div class="btn-row"><button class="btn-secondary" id="saveWindowHours">儲存</button></div>
+      <p class="desc" style="margin:4px 0 14px;font-size:13.5px;color:var(--ink-3)">每筆預約會佔用這麼長的時間，這段時間內其他人無法預約。營業時間固定為 12:00 – 隔日 03:00。</p>
+      <div class="toolbar" style="margin-bottom:0">
+        <div class="field">
+          <label for="windowHoursSel">時段長度</label>
+          <select id="windowHoursSel">
+            <option value="2">2 小時</option>
+            <option value="3">3 小時</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" id="saveWindowHours" type="button">儲存</button>
+      </div>
     </div>
 
     <div class="card">
       <h2>公休 / 關閉時段</h2>
-      <div class="form-row">
-        <div><label>日期</label><input id="cloDate" type="date"></div>
-        <div>
-          <label>&nbsp;</label>
-          <label style="display:flex;align-items:center;gap:6px;"><input id="cloAllDay" type="checkbox" style="width:auto;"> 關閉整天</label>
-        </div>
+      <p class="desc" style="margin:4px 0 14px;font-size:13.5px;color:var(--ink-3)">可以關閉整天，或只關閉某個時間範圍（其餘時間仍可預約）。凌晨 00:00–03:00 屬於前一個營業日。</p>
+      <div class="inline-form">
+        <div class="field"><label for="cloDate">營業日</label><input id="cloDate" type="date"></div>
+        <label class="check" style="padding-bottom:10px"><input id="cloAllDay" type="checkbox" checked> 關閉整天</label>
       </div>
-      <div class="form-row" id="cloRangeFields">
-        <div><label>關閉起</label><input id="cloStart" type="time"></div>
-        <div><label>關閉迄</label><input id="cloEnd" type="time"></div>
+      <div class="inline-form" id="cloRangeFields" style="margin-top:12px" hidden>
+        <div class="field"><label for="cloStart">關閉起</label><input id="cloStart" type="time"></div>
+        <div class="field"><label for="cloEnd">關閉迄</label><input id="cloEnd" type="time"></div>
       </div>
-      <label>原因</label>
-      <input id="cloReason" type="text" placeholder="選填">
-      <div class="btn-row"><button class="btn-secondary" id="cloAdd">新增關閉</button></div>
-      <div id="cloError" class="error-box" hidden></div>
-      <div class="table-scroll">
-        <table id="cloTable">
-          <thead><tr><th>日期</th><th>範圍</th><th>原因</th><th></th></tr></thead>
+      <div class="field"><label for="cloReason">原因（選填）</label><input id="cloReason" type="text" maxlength="60" placeholder="例如：公休、設備保養"></div>
+      <div class="btn-row" style="margin-top:14px"><button class="btn btn-primary btn-sm" id="cloAdd" type="button">新增關閉</button></div>
+      <div id="cloError" class="alert alert-danger" style="margin-top:12px" hidden></div>
+      <div class="table-scroll" style="margin-top:16px">
+        <table class="data" id="cloTable" style="min-width:480px">
+          <thead><tr><th>營業日</th><th>範圍</th><th>原因</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
+      <div class="empty" id="cloEmpty" hidden>目前沒有關閉設定。</div>
     </div>
   </section>
 
+  <!-- 車型 -->
   <section id="tab-vehicles" class="tab-panel" hidden>
     <div class="card">
       <h2>車型級距價格</h2>
+      <p class="hint" style="margin-bottom:10px">修改級距價格後，該級距底下所有車型的新預約都會套用新價格（舊訂單不受影響）。</p>
       <div class="table-scroll">
-        <table id="tierTable">
-          <thead><tr><th>級距</th><th>價格</th><th></th></tr></thead>
+        <table class="data" id="tierTable" style="min-width:380px">
+          <thead><tr><th>級距</th><th>洗車價格</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -104,42 +144,77 @@
 
     <div class="card">
       <h2>廠牌 / 車型對照</h2>
-      <input id="vehFilter" type="text" placeholder="搜尋廠牌或型號...">
-      <h3 style="margin-top:18px;">新增車型</h3>
-      <div class="form-row">
-        <div><label>廠牌</label><input id="newBrand" type="text"></div>
-        <div><label>型號</label><input id="newModel" type="text"></div>
-        <div><label>級距</label><select id="newTier"></select></div>
-        <div style="display:flex;align-items:flex-end;"><button class="btn-secondary" id="vehAdd">新增</button></div>
+      <div class="inline-form" style="margin:12px 0 4px">
+        <div class="field"><label for="newBrand">廠牌</label><input id="newBrand" type="text" maxlength="40"></div>
+        <div class="field"><label for="newModel">型號</label><input id="newModel" type="text" maxlength="40"></div>
+        <div class="field"><label for="newTier">級距</label><select id="newTier"></select></div>
+        <button class="btn btn-primary btn-sm" id="vehAdd" type="button">新增車型</button>
       </div>
-      <div id="vehError" class="error-box" hidden></div>
+      <div id="vehError" class="alert alert-danger" style="margin-top:10px" hidden></div>
+      <div class="field" style="margin-top:18px"><label for="vehFilter">搜尋</label><input id="vehFilter" type="text" placeholder="輸入廠牌或型號…"></div>
+      <div class="hint" id="vehCount" style="margin:8px 0"></div>
       <div class="table-scroll">
-        <table id="vehTable">
-          <thead><tr><th>廠牌</th><th>型號</th><th>級距</th><th>啟用</th><th></th></tr></thead>
+        <table class="data" id="vehTable" style="min-width:520px">
+          <thead><tr><th>廠牌</th><th>型號</th><th>級距</th><th>開放預約</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
     </div>
   </section>
 
+  <!-- CRM -->
   <section id="tab-crm" class="tab-panel" hidden>
     <div class="card">
       <h2>客戶 CRM</h2>
-      <input id="crmSearch" type="text" placeholder="搜尋電話或姓名...">
+      <p class="hint" style="margin-bottom:10px">以電話辨識客人。每筆預約算一次消費，取消會扣回。點客人可看消費紀錄。</p>
+      <div class="field"><label for="crmSearch">搜尋</label><input id="crmSearch" type="text" placeholder="電話或姓名…"></div>
+      <div class="stats" id="crmStats" style="margin-top:12px"></div>
       <div class="table-scroll">
-        <table id="crmTable">
-          <thead><tr><th>電話</th><th>姓名</th><th>次數</th><th>總消費</th><th>最近到店</th></tr></thead>
+        <table class="data" id="crmTable" style="min-width:560px">
+          <thead><tr><th>姓名</th><th>電話</th><th>LINE</th><th>消費次數</th><th>累計金額</th><th>最近預約</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
+      <div class="empty" id="crmEmpty" hidden>還沒有客戶資料。</div>
     </div>
     <div id="crmHistory"></div>
   </section>
 
+</main>
+
+<!-- 訂單詳情 -->
+<div id="orderModal" class="modal-mask" hidden>
+  <div class="modal-box big" role="dialog" aria-modal="true" aria-labelledby="omTitle">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
+      <h3 id="omTitle" style="margin:0"></h3>
+      <span id="omState"></span>
+    </div>
+    <table class="kv" id="omTable"></table>
+
+    <div class="row2" style="margin-top:18px">
+      <div class="field" style="margin-top:0">
+        <label for="omPrice">金額（可加上牽車費）</label>
+        <input id="omPrice" type="number" min="0" step="10" inputmode="numeric">
+        <div class="hint" id="omPriceHint"></div>
+      </div>
+      <div class="field" style="margin-top:0">
+        <label for="omNote">店家內部備註</label>
+        <textarea id="omNote" maxlength="500" style="min-height:64px"></textarea>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary btn-sm" id="omSave" type="button">儲存金額 / 備註</button>
+      <button class="btn btn-secondary btn-sm" id="omVerify" type="button"></button>
+      <button class="btn btn-danger btn-sm" id="omCancel" type="button">取消預約</button>
+      <button class="btn btn-ghost btn-sm" id="omClose" type="button" style="margin-left:auto">關閉</button>
+    </div>
+  </div>
 </div>
 
-<script src="assets/config.js"></script>
-<script src="assets/api.js"></script>
-<script src="assets/admin.js"></script>
+<script src="assets/config.js?v=3"></script>
+<script src="assets/util.js?v=3"></script>
+<script src="assets/api.js?v=3"></script>
+<script src="assets/admin.js?v=3"></script>
 </body>
 </html>

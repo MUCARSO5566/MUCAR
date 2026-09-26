@@ -2,324 +2,443 @@
   'use strict';
 
   var CFG = window.CARWASH_CONFIG;
-  document.title = CFG.SHOP_NAME + ' — 後台管理';
+  var KEY_STORE = 'mucar_admin_key';   // 管理密碼只存在後台，客人頁面不會讀取
+  function $(id) { return document.getElementById(id); }
+  function safeGet() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
+  function safeSet(v) { try { v ? localStorage.setItem(KEY_STORE, v) : localStorage.removeItem(KEY_STORE); } catch (e) { /* 無痕模式等 */ } }
 
-  var el = {};
-  ['loginMask', 'loginPwd', 'loginBtn', 'loginError', 'adminArea', 'logoutBtn',
-   'ordFrom', 'ordTo', 'ordSearch', 'ordError', 'ordTable',
-   'windowHoursSel', 'saveWindowHours',
-   'cloDate', 'cloAllDay', 'cloRangeFields', 'cloStart', 'cloEnd', 'cloReason', 'cloAdd', 'cloError', 'cloTable',
-   'tierTable', 'vehFilter', 'newBrand', 'newModel', 'newTier', 'vehAdd', 'vehError', 'vehTable',
-   'crmSearch', 'crmTable', 'crmHistory'
-  ].forEach(function (id) { el[id] = document.getElementById(id); });
+  var S = { orders: [], tiers: [], types: [], customers: [], open: null, closures: [] };
 
-  var state = { tiers: [], vehicleTypes: [] };
+  /* ---------------- 呼叫後端（密碼失效時自動回登入畫面） ---------------- */
 
-  /* ---------------- 登入 ---------------- */
-
-  function showLogin() {
-    Api.setKey('');
-    el.loginMask.hidden = false;
-    el.adminArea.hidden = true;
-    el.logoutBtn.hidden = true;
+  function call(action, payload) {
+    return Api.call(action, payload).catch(function (err) {
+      if (/管理密碼錯誤/.test(err.message)) { logout(); }
+      throw err;
+    });
   }
+  function fail(err) { U.toast(err.message, 'error'); }
 
+  /* ---------------- 登入 / 登出 ---------------- */
+
+  var problem = Api.configProblem();
+  if (problem) { $('loginConfig').textContent = problem; $('loginConfig').hidden = false; }
+
+  function showLogin(msg) {
+    Api.key = CFG.PUBLIC_KEY;
+    $('loginMask').hidden = false;
+    $('adminArea').hidden = true;
+    $('logoutBtn').hidden = true;
+    if (msg) { $('loginError').textContent = msg; $('loginError').hidden = false; }
+  }
   function showAdmin() {
-    el.loginMask.hidden = true;
-    el.adminArea.hidden = false;
-    el.logoutBtn.hidden = false;
+    $('loginMask').hidden = true;
+    $('adminArea').hidden = false;
+    $('logoutBtn').hidden = false;
+    $('loginError').hidden = true;
+    $('loginPwd').value = '';
     initAdmin();
   }
+  function logout() { safeSet(''); showLogin(); }
 
-  function tryEnter() {
-    Api.call('listRows', { sheet: 'Settings' }).then(showAdmin).catch(showLogin);
+  function enter(key, silent) {
+    Api.key = key;
+    return Api.call('listRows', { sheet: 'Settings' }).then(function () {
+      safeSet(key);
+      showAdmin();
+    }).catch(function (err) {
+      showLogin(silent && /管理密碼錯誤/.test(err.message) ? '' : err.message);
+      if (/管理密碼錯誤/.test(err.message)) safeSet('');
+    });
   }
 
-  el.loginBtn.addEventListener('click', function () {
-    el.loginError.hidden = true;
-    Api.setKey(el.loginPwd.value.trim());
-    Api.call('listRows', { sheet: 'Settings' }).then(showAdmin).catch(function (err) {
-      el.loginError.textContent = err.message;
-      el.loginError.hidden = false;
-      Api.setKey('');
-    });
+  $('loginForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var k = $('loginPwd').value.trim();
+    if (!k) return;
+    $('loginBtn').disabled = true;
+    enter(k, false).then(function () { $('loginBtn').disabled = false; });
   });
+  $('logoutBtn').addEventListener('click', logout);
 
-  el.logoutBtn.addEventListener('click', showLogin);
+  /* ---------------- 分頁 ---------------- */
 
-  /* ---------------- 分頁切換 ---------------- */
-
-  document.querySelectorAll('.tab-btn').forEach(function (btn) {
+  Array.prototype.forEach.call(document.querySelectorAll('.tab-btn'), function (btn) {
     btn.addEventListener('click', function () {
-      document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
-      document.querySelectorAll('.tab-panel').forEach(function (p) { p.hidden = true; });
-      btn.classList.add('active');
-      document.getElementById('tab-' + btn.dataset.tab).hidden = false;
+      Array.prototype.forEach.call(document.querySelectorAll('.tab-btn'), function (b) { b.classList.toggle('active', b === btn); });
+      Array.prototype.forEach.call(document.querySelectorAll('.tab-panel'), function (p) { p.hidden = true; });
+      $('tab-' + btn.dataset.tab).hidden = false;
     });
   });
 
   function initAdmin() {
-    var today = new Date().toISOString().slice(0, 10);
-    el.ordFrom.value = today;
-    el.ordTo.value = today;
-    loadOrders();
+    setPreset('week');
     loadSettings();
     loadClosures();
     loadVehicles();
     loadCustomers();
   }
 
-  /* ---------------- 訂單管理 ---------------- */
+  /* ============================================================
+   *  預約訂單
+   * ============================================================ */
+
+  function setPreset(p) {
+    var t = U.serviceToday();
+    var from = t, to = t;
+    if (p === 'tomorrow') { from = to = U.addDays(t, 1); }
+    else if (p === 'week') { to = U.addDays(t, 6); }
+    else if (p === 'all') { from = to = ''; }
+    $('ordFrom').value = from;
+    $('ordTo').value = to;
+    loadOrders();
+  }
 
   function loadOrders() {
-    el.ordError.hidden = true;
-    Api.call('listOrders', { from: el.ordFrom.value, to: el.ordTo.value }).then(renderOrders).catch(function (err) {
-      el.ordError.textContent = err.message;
-      el.ordError.hidden = false;
-    });
+    $('ordError').hidden = true;
+    return call('listOrders', { from: $('ordFrom').value, to: $('ordTo').value }).then(function (rows) {
+      S.orders = rows;
+      renderOrders();
+      if (S.open) refreshOpen();
+    }).catch(function (err) { $('ordError').textContent = err.message; $('ordError').hidden = false; });
   }
 
-  function renderOrders(rows) {
-    var tbody = el.ordTable.querySelector('tbody');
-    tbody.innerHTML = '';
-    rows.forEach(function (o) {
-      var tr = document.createElement('tr');
-      var vehicleText = o.vehicleBrand ? (o.vehicleBrand + ' ' + o.vehicleModel) : '待確認';
-      var priceText = o.needsPricing ? '待確認' : ('$' + o.price);
-      var verifiedTag = o.status !== 'ACTIVE' ? '—' :
-        '<span class="tag ' + (Boolean(o.verified) ? 'ok' : 'warn') + ' clickable" data-act="verify" data-order="' + o.orderNo + '" style="cursor:pointer;">' +
-        (Boolean(o.verified) ? '已核對' : '未核對') + '</span>';
-      var statusTag = o.status === 'ACTIVE' ? '<span class="tag ok">預約中</span>' : '<span class="tag warn">已取消</span>';
-      var cancelBtn = o.status === 'ACTIVE' ? '<button class="btn-ghost" data-act="cancel" data-order="' + o.orderNo + '">取消</button>' : '';
+  function vehLabel(o) { return (o.vehicleBrand || '') + ' ' + (o.vehicleModel || ''); }
+  function priced(o) { return !U.isTrue(o.needsPricing) && o.price !== '' && o.price != null; }
 
-      tr.innerHTML =
-        '<td>' + o.orderNo + '</td><td>' + o.serviceDay + '</td>' +
-        '<td>' + (o.startAt || '').slice(11, 16) + '-' + (o.endAt || '').slice(11, 16) + '</td>' +
-        '<td>' + o.customerName + '</td><td>' + o.phone + '</td>' +
-        '<td>' + vehicleText + '</td><td>' + priceText + '</td>' +
+  function stateTag(o) {
+    var s = U.orderState(o);
+    return s === 'CANCELLED' ? '<span class="tag warn">已取消</span>' : (s === 'DONE' ? '<span class="tag">已完成</span>' : '<span class="tag ok">預約中</span>');
+  }
+  function verifyTag(o) {
+    if (o.status !== 'ACTIVE') return '<span class="hint">—</span>';
+    if (o.paymentMethod !== 'transfer') return '<span class="hint">現場付款</span>';
+    return U.isTrue(o.verified) ? '<span class="tag ok">已核對</span>' : '<span class="tag amber">未核對</span>';
+  }
+
+  function renderOrders() {
+    var f = $('ordStatus').value;
+    var rows = S.orders.filter(function (o) { return !f || U.orderState(o) === f; });
+
+    var active = S.orders.filter(function (o) { return o.status === 'ACTIVE'; });
+    var unverified = active.filter(function (o) { return o.paymentMethod === 'transfer' && !U.isTrue(o.verified); }).length;
+    var unpriced = active.filter(function (o) { return !priced(o); }).length;
+    $('ordStats').innerHTML =
+      '<div class="stat"><b>' + rows.length + '</b>筆</div>' +
+      '<div class="stat"><b>' + unverified + '</b>匯款待核對</div>' +
+      '<div class="stat"><b>' + unpriced + '</b>待報價</div>';
+
+    var tbody = $('ordTable').querySelector('tbody');
+    tbody.innerHTML = rows.map(function (o) {
+      var off = o.status !== 'ACTIVE';
+      return '<tr class="click' + (off ? ' off' : '') + '" data-order="' + U.esc(o.orderNo) + '">' +
+        '<td><b class="strike">' + U.esc(o.serviceDay.slice(5)) + '</b><br><span class="strike">' + U.esc(o.startAt.slice(11, 16)) + '–' + U.esc(o.endAt.slice(11, 16)) + '</span></td>' +
+        '<td>' + U.esc(o.customerName) + '<br><span class="hint">' + U.esc(o.phone) + '</span></td>' +
+        '<td>' + U.esc(vehLabel(o)) + (U.isTrue(o.needsPricing) ? ' <span class="tag amber">待報價</span>' : '') + '</td>' +
+        '<td>' + (priced(o) ? U.money(o.price) : '—') + '</td>' +
         '<td>' + (o.paymentMethod === 'transfer' ? '匯款' : '現場') + '</td>' +
-        '<td>' + verifiedTag + '</td><td>' + statusTag + '</td><td>' + cancelBtn + '</td>';
-      tbody.appendChild(tr);
-    });
+        '<td>' + verifyTag(o) + '</td>' +
+        '<td>' + stateTag(o) + '</td></tr>';
+    }).join('');
+    $('ordEmpty').hidden = rows.length > 0;
+    $('ordTable').hidden = rows.length === 0;
   }
 
-  el.ordSearch.addEventListener('click', loadOrders);
-
-  el.ordTable.addEventListener('click', function (e) {
-    var t = e.target;
-    var act = t.dataset.act, orderNo = t.dataset.order;
-    if (!act) return;
-    if (act === 'verify') {
-      Api.call('toggleVerified', { orderNo: orderNo }).then(loadOrders).catch(function (err) { alert(err.message); });
-    } else if (act === 'cancel') {
-      if (!confirm('確定要取消訂單 ' + orderNo + ' 嗎？該客人的消費次數也會被扣除。')) return;
-      Api.call('cancelOrder', { orderNo: orderNo }).then(loadOrders).catch(function (err) { alert(err.message); });
-    }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-preset]'), function (b) {
+    b.addEventListener('click', function () { setPreset(b.dataset.preset); });
+  });
+  $('ordSearch').addEventListener('click', loadOrders);
+  $('ordStatus').addEventListener('change', renderOrders);
+  $('ordTable').addEventListener('click', function (e) {
+    var tr = e.target.closest('tr[data-order]');
+    if (tr) openOrder(tr.dataset.order);
   });
 
-  /* ---------------- 時段設定 ---------------- */
+  /* ---------------- 訂單詳情 ---------------- */
+
+  function kv(k, v) { return '<tr><th>' + k + '</th><td>' + v + '</td></tr>'; }
+
+  function openOrder(orderNo) {
+    S.open = orderNo;
+    $('orderModal').hidden = false;
+    refreshOpen();
+  }
+
+  function refreshOpen() {
+    var o = S.orders.filter(function (x) { return x.orderNo === S.open; })[0];
+    if (!o) { $('orderModal').hidden = true; S.open = null; return; }
+
+    $('omTitle').textContent = '訂單 ' + o.orderNo;
+    $('omState').innerHTML = stateTag(o);
+    var tel = String(o.phone);
+    $('omTable').innerHTML =
+      kv('客人', U.esc(o.customerName) + '　<a href="tel:' + U.esc(tel) + '">' + U.esc(tel) + '</a>') +
+      kv('LINE / 生日', U.esc(o.lineId || '—') + '　/　' + U.esc(o.birthday || '—')) +
+      kv('車型', U.esc(vehLabel(o)) + '<br><span class="hint">' + U.esc(o.tierName || '') + '</span>') +
+      kv('牽車地址', U.esc(o.pickupAddress || '—') + (o.pickupAddress ? '　<a href="' + U.esc(U.mapUrl(o.pickupAddress)) + '" target="_blank" rel="noopener">開啟地圖</a>' : '')) +
+      kv('預約時段', U.esc(o.startAt.slice(0, 16)) + ' ～ ' + U.esc(o.endAt.slice(11, 16))) +
+      kv('付款方式', o.paymentMethod === 'transfer'
+        ? '匯款<br><span class="hint">匯款日期 ' + U.esc(o.transferDate) + '　轉出末五碼 <b>' + U.esc(o.transferLast5) + '</b>　' + (U.isTrue(o.verified) ? '（已核對）' : '（未核對）') + '</span>'
+        : '現場付款') +
+      kv('客人備註', U.esc(o.note || '—').replace(/\n/g, '<br>')) +
+      kv('建立時間', U.esc(o.createdAt)) +
+      (o.status !== 'ACTIVE' ? kv('取消', U.esc((o.cancelledBy === 'admin' ? '店家' : '客人') + ' · ' + o.cancelledAt + (o.cancelReason ? ' · ' + o.cancelReason : ''))) : '');
+
+    $('omPrice').value = priced(o) ? o.price : '';
+    $('omPriceHint').textContent = priced(o) ? '' : '此單為「待確認車型」，請確認後填入金額。';
+    $('omNote').value = o.adminNote || '';
+
+    var active = o.status === 'ACTIVE';
+    $('omSave').hidden = false;
+    $('omCancel').hidden = !active;
+    $('omVerify').hidden = !(active && o.paymentMethod === 'transfer');
+    $('omVerify').textContent = U.isTrue(o.verified) ? '改回未核對' : '標記為已核對';
+  }
+
+  function closeOrder() { $('orderModal').hidden = true; S.open = null; }
+  $('omClose').addEventListener('click', closeOrder);
+  $('orderModal').addEventListener('click', function (e) { if (e.target === this) closeOrder(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeOrder(); });
+
+  $('omSave').addEventListener('click', function () {
+    var body = { orderNo: S.open, adminNote: $('omNote').value };
+    var p = $('omPrice').value.trim();
+    if (p !== '') {
+      if (isNaN(Number(p)) || Number(p) < 0) return U.toast('金額格式錯誤', 'error');
+      body.price = Number(p);
+    }
+    $('omSave').disabled = true;
+    call('updateOrder', body).then(function () { U.toast('已儲存'); return loadOrders(); })
+      .catch(fail).then(function () { $('omSave').disabled = false; });
+  });
+
+  $('omVerify').addEventListener('click', function () {
+    call('toggleVerified', { orderNo: S.open }).then(function () { U.toast('已更新核對狀態'); return loadOrders(); }).catch(fail);
+  });
+
+  $('omCancel').addEventListener('click', function () {
+    if (!confirm('確定要取消訂單 ' + S.open + ' 嗎？\n時段會釋放，該客人的消費次數也會扣回。')) return;
+    var reason = prompt('取消原因（可留空）：', '') || '';
+    call('cancelOrder', { orderNo: S.open, reason: reason }).then(function () {
+      U.toast('預約已取消');
+      closeOrder();
+      loadOrders(); loadCustomers();
+    }).catch(fail);
+  });
+
+  /* ============================================================
+   *  時段設定
+   * ============================================================ */
 
   function loadSettings() {
-    Api.call('listRows', { sheet: 'Settings' }).then(function (rows) {
-      var map = {};
-      rows.forEach(function (r) { map[r.key] = r.value; });
-      el.windowHoursSel.value = map.windowHours || '3';
-    });
+    call('listRows', { sheet: 'Settings' }).then(function (rows) {
+      var m = {};
+      rows.forEach(function (r) { m[r.key] = r.value; });
+      $('windowHoursSel').value = m.windowHours || '3';
+    }).catch(fail);
   }
 
-  el.saveWindowHours.addEventListener('click', function () {
-    Api.call('saveSettings', { key: 'windowHours', value: el.windowHoursSel.value }).then(function () {
-      alert('已儲存');
-    }).catch(function (err) { alert(err.message); });
+  $('saveWindowHours').addEventListener('click', function () {
+    call('saveSettings', { settingKey: 'windowHours', value: $('windowHoursSel').value })
+      .then(function () { U.toast('時段長度已更新，之後的新預約會套用'); }).catch(fail);
   });
 
-  el.cloAllDay.addEventListener('change', function () {
-    el.cloRangeFields.hidden = el.cloAllDay.checked;
-  });
+  $('cloAllDay').addEventListener('change', function () { $('cloRangeFields').hidden = this.checked; });
 
   function loadClosures() {
-    Api.call('listRows', { sheet: 'Closure' }).then(renderClosures);
+    call('listRows', { sheet: 'Closure' }).then(function (rows) {
+      S.closures = rows;
+      renderClosures();
+    }).catch(fail);
   }
 
-  function renderClosures(rows) {
-    var tbody = el.cloTable.querySelector('tbody');
-    tbody.innerHTML = '';
-    rows.sort(function (a, b) { return String(b.serviceDay).localeCompare(String(a.serviceDay)); });
-    rows.forEach(function (c) {
-      var tr = document.createElement('tr');
-      var rangeText = Boolean(c.allDay) ? '整天' : ((c.startAt || '').slice(11, 16) + ' - ' + (c.endAt || '').slice(11, 16));
-      tr.innerHTML =
-        '<td>' + c.serviceDay + '</td><td>' + rangeText + '</td><td>' + (c.reason || '') + '</td>' +
-        '<td><button class="btn-ghost" data-id="' + c.id + '">刪除</button></td>';
-      tbody.appendChild(tr);
-    });
+  function renderClosures() {
+    var today = U.serviceToday();
+    var rows = S.closures.slice().sort(function (a, b) { return String(a.serviceDay).localeCompare(String(b.serviceDay)); });
+    $('cloTable').querySelector('tbody').innerHTML = rows.map(function (c) {
+      var range = U.isTrue(c.allDay) ? '整天' : (String(c.startAt).slice(11, 16) + ' – ' + String(c.endAt).slice(11, 16));
+      var past = String(c.serviceDay) < today;
+      return '<tr class="' + (past ? 'off' : '') + '"><td>' + U.esc(U.dayLabel(c.serviceDay)) + ' ' + U.esc(c.serviceDay) + '</td><td>' + range + '</td><td>' + U.esc(c.reason || '') +
+        '</td><td><button class="btn btn-ghost btn-sm" data-del="' + U.esc(c.id) + '" type="button">刪除</button></td></tr>';
+    }).join('');
+    $('cloEmpty').hidden = rows.length > 0;
+    $('cloTable').hidden = rows.length === 0;
   }
 
-  el.cloAdd.addEventListener('click', function () {
-    el.cloError.hidden = true;
-    var day = el.cloDate.value;
-    if (!day) { el.cloError.textContent = '請選擇日期'; el.cloError.hidden = false; return; }
-    var allDay = el.cloAllDay.checked;
-    var row = { serviceDay: day, allDay: allDay, reason: el.cloReason.value.trim() };
-    if (!allDay) {
-      if (!el.cloStart.value || !el.cloEnd.value) {
-        el.cloError.textContent = '請輸入關閉的起訖時間';
-        el.cloError.hidden = false;
+  /** 時鐘時間 → 實際日期時間（00:00–11:59 算隔天，跟後端規則一致） */
+  function actualDT(day, hhmm) {
+    var h = Number(hhmm.split(':')[0]);
+    return (h < 12 ? U.addDays(day, 1) : day) + ' ' + hhmm + ':00';
+  }
+
+  $('cloAdd').addEventListener('click', function () {
+    var err = $('cloError');
+    err.hidden = true;
+    var day = $('cloDate').value;
+    if (!day) { err.textContent = '請選擇營業日'; err.hidden = false; return; }
+    var row = { serviceDay: day, allDay: $('cloAllDay').checked, reason: $('cloReason').value.trim() };
+
+    if (!row.allDay) {
+      var s = $('cloStart').value, e = $('cloEnd').value;
+      if (!s || !e) { err.textContent = '請輸入關閉的起訖時間'; err.hidden = false; return; }
+      row.startAt = actualDT(day, s);
+      row.endAt = actualDT(day, e);
+      var open = U.wallMs(day + ' 12:00:00'), close = U.wallMs(U.addDays(day, 1) + ' 03:00:00');
+      var a = U.wallMs(row.startAt), b = U.wallMs(row.endAt);
+      if (!(a < b) || a < open || b > close) {
+        err.textContent = '關閉時間必須在營業時間（12:00 – 隔日 03:00）內，而且結束要晚於開始。凌晨時段請填 00:00–03:00。';
+        err.hidden = false;
         return;
       }
-      row.startAt = day + ' ' + el.cloStart.value + ':00';
-      row.endAt = day + ' ' + el.cloEnd.value + ':00';
     }
-    Api.call('saveClosure', { row: row }).then(function () {
-      el.cloReason.value = '';
+    call('saveClosure', { row: row }).then(function () {
+      $('cloReason').value = '';
+      U.toast('已新增關閉設定');
       loadClosures();
-    }).catch(function (err) { el.cloError.textContent = err.message; el.cloError.hidden = false; });
+    }).catch(function (e2) { err.textContent = e2.message; err.hidden = false; });
   });
 
-  el.cloTable.addEventListener('click', function (e) {
-    var id = e.target.dataset.id;
-    if (!id) return;
-    if (!confirm('確定刪除這筆關閉設定嗎？')) return;
-    Api.call('deleteRow', { sheet: 'Closure', id: id }).then(loadClosures).catch(function (err) { alert(err.message); });
+  $('cloTable').addEventListener('click', function (e) {
+    var id = e.target.dataset.del;
+    if (!id || !confirm('確定刪除這筆關閉設定嗎？')) return;
+    call('deleteRow', { sheet: 'Closure', id: id }).then(function () { U.toast('已刪除'); loadClosures(); }).catch(fail);
   });
 
-  /* ---------------- 車型計價 ---------------- */
+  /* ============================================================
+   *  車型計價
+   * ============================================================ */
 
   function loadVehicles() {
-    Promise.all([
-      Api.call('listRows', { sheet: 'VehicleTier' }),
-      Api.call('listRows', { sheet: 'VehicleType' })
-    ]).then(function (res) {
-      state.tiers = res[0].sort(function (a, b) { return Number(a.sort) - Number(b.sort); });
-      state.vehicleTypes = res[1];
+    return Promise.all([call('listRows', { sheet: 'VehicleTier' }), call('listRows', { sheet: 'VehicleType' })]).then(function (r) {
+      S.tiers = r[0].sort(function (a, b) { return Number(a.sort) - Number(b.sort); });
+      S.types = r[1];
       renderTiers();
-      renderTierSelect();
+      $('newTier').innerHTML = S.tiers.map(function (t) { return '<option value="' + U.esc(t.id) + '">' + U.esc(t.name) + '</option>'; }).join('');
       renderVehicles();
-    });
+    }).catch(fail);
   }
 
   function renderTiers() {
-    var tbody = el.tierTable.querySelector('tbody');
-    tbody.innerHTML = '';
-    state.tiers.forEach(function (t) {
-      var tr = document.createElement('tr');
-      tr.innerHTML =
-        '<td>' + t.name + '</td>' +
-        '<td><input type="number" data-tier="' + t.id + '" value="' + t.price + '" style="width:100px;"></td>' +
-        '<td><button class="btn-ghost" data-save-tier="' + t.id + '">儲存</button></td>';
-      tbody.appendChild(tr);
-    });
+    $('tierTable').querySelector('tbody').innerHTML = S.tiers.map(function (t) {
+      return '<tr><td><b>' + U.esc(t.name) + '</b></td>' +
+        '<td><input class="money-in" type="number" min="0" step="10" data-price="' + U.esc(t.id) + '" value="' + U.esc(t.price) + '"></td>' +
+        '<td><button class="btn btn-secondary btn-sm" data-save-tier="' + U.esc(t.id) + '" type="button">儲存</button></td></tr>';
+    }).join('');
   }
 
-  el.tierTable.addEventListener('click', function (e) {
+  $('tierTable').addEventListener('click', function (e) {
     var id = e.target.dataset.saveTier;
     if (!id) return;
-    var input = el.tierTable.querySelector('input[data-tier="' + id + '"]');
-    var tier = state.tiers.filter(function (t) { return t.id === id; })[0];
-    Api.call('saveVehicleTier', { row: { id: id, name: tier.name, price: Number(input.value), sort: tier.sort, active: true } })
-      .then(loadVehicles).catch(function (err) { alert(err.message); });
+    var input = $('tierTable').querySelector('input[data-price="' + id + '"]');
+    var t = S.tiers.filter(function (x) { return x.id === id; })[0];
+    if (input.value === '' || isNaN(Number(input.value)) || Number(input.value) < 0) return U.toast('價格格式錯誤', 'error');
+    call('saveVehicleTier', { row: { id: id, name: t.name, price: Number(input.value), sort: t.sort, active: true } })
+      .then(function () { U.toast(t.name + ' 價格已更新'); return loadVehicles(); }).catch(fail);
   });
 
-  function renderTierSelect() {
-    el.newTier.innerHTML = state.tiers.map(function (t) { return '<option value="' + t.id + '">' + t.name + ' $' + t.price + '</option>'; }).join('');
-  }
-
   function renderVehicles() {
-    var q = el.vehFilter.value.trim().toLowerCase();
-    var tbody = el.vehTable.querySelector('tbody');
-    tbody.innerHTML = '';
-    var tierName = {};
-    state.tiers.forEach(function (t) { tierName[t.id] = t.name; });
-
-    state.vehicleTypes
-      .filter(function (v) { return !q || (v.brand + ' ' + v.model).toLowerCase().indexOf(q) >= 0; })
-      .forEach(function (v) {
-        var tr = document.createElement('tr');
-        var tierOptions = state.tiers.map(function (t) {
-          return '<option value="' + t.id + '"' + (t.id === v.tierId ? ' selected' : '') + '>' + t.name + '</option>';
-        }).join('');
-        tr.innerHTML =
-          '<td>' + v.brand + '</td><td>' + v.model + '</td>' +
-          '<td><select data-tier-of="' + v.id + '">' + tierOptions + '</select></td>' +
-          '<td><input type="checkbox" data-active-of="' + v.id + '"' + (Boolean(v.active) ? ' checked' : '') + '></td>' +
-          '<td><button class="btn-ghost" data-del-veh="' + v.id + '">刪除</button></td>';
-        tbody.appendChild(tr);
-      });
+    var q = $('vehFilter').value.trim().toLowerCase();
+    var list = S.types.filter(function (v) { return !q || (v.brand + ' ' + v.model).toLowerCase().indexOf(q) >= 0; });
+    $('vehCount').textContent = '共 ' + list.length + ' 筆' + (q ? '（符合搜尋）' : '') + '；取消勾選「開放預約」的車型不會出現在前台選單。';
+    $('vehTable').querySelector('tbody').innerHTML = list.map(function (v) {
+      var opts = S.tiers.map(function (t) {
+        return '<option value="' + U.esc(t.id) + '"' + (t.id === v.tierId ? ' selected' : '') + '>' + U.esc(t.name) + '</option>';
+      }).join('');
+      return '<tr><td>' + U.esc(v.brand) + '</td><td>' + U.esc(v.model) + '</td>' +
+        '<td><select data-tier-of="' + U.esc(v.id) + '">' + opts + '</select></td>' +
+        '<td><input type="checkbox" data-active-of="' + U.esc(v.id) + '"' + (U.isTrue(v.active) ? ' checked' : '') + '></td>' +
+        '<td><button class="btn btn-ghost btn-sm" data-del-veh="' + U.esc(v.id) + '" type="button">刪除</button></td></tr>';
+    }).join('');
   }
 
-  el.vehFilter.addEventListener('input', renderVehicles);
+  $('vehFilter').addEventListener('input', renderVehicles);
 
-  el.vehTable.addEventListener('change', function (e) {
+  $('vehTable').addEventListener('change', function (e) {
     var t = e.target;
     var id = t.dataset.tierOf || t.dataset.activeOf;
     if (!id) return;
-    var v = state.vehicleTypes.filter(function (x) { return x.id === id; })[0];
-    var tierId = t.dataset.tierOf ? t.value : v.tierId;
-    var active = t.dataset.activeOf ? t.checked : Boolean(v.active);
-    Api.call('saveVehicleType', { row: { id: id, brand: v.brand, model: v.model, tierId: tierId, sort: v.sort, active: active } })
-      .then(loadVehicles).catch(function (err) { alert(err.message); });
+    var v = S.types.filter(function (x) { return x.id === id; })[0];
+    var row = { id: id, brand: v.brand, model: v.model, sort: v.sort, tierId: v.tierId, active: U.isTrue(v.active) };
+    if (t.dataset.tierOf) row.tierId = t.value; else row.active = t.checked;
+    call('saveVehicleType', { row: row }).then(function () {
+      v.tierId = row.tierId; v.active = row.active;
+      U.toast('已儲存');
+    }).catch(function (err) { fail(err); loadVehicles(); });
   });
 
-  el.vehTable.addEventListener('click', function (e) {
+  $('vehTable').addEventListener('click', function (e) {
     var id = e.target.dataset.delVeh;
-    if (!id) return;
-    if (!confirm('確定刪除這個車型嗎？')) return;
-    Api.call('deleteRow', { sheet: 'VehicleType', id: id }).then(loadVehicles).catch(function (err) { alert(err.message); });
+    if (!id || !confirm('確定刪除這個車型嗎？（歷史訂單不受影響）')) return;
+    call('deleteRow', { sheet: 'VehicleType', id: id }).then(function () { U.toast('已刪除'); return loadVehicles(); }).catch(fail);
   });
 
-  el.vehAdd.addEventListener('click', function () {
-    el.vehError.hidden = true;
-    var brand = el.newBrand.value.trim(), model = el.newModel.value.trim();
-    if (!brand || !model) { el.vehError.textContent = '請輸入廠牌與型號'; el.vehError.hidden = false; return; }
-    Api.call('saveVehicleType', { row: { brand: brand, model: model, tierId: el.newTier.value, sort: state.vehicleTypes.length + 1, active: true } })
+  $('vehAdd').addEventListener('click', function () {
+    var err = $('vehError');
+    err.hidden = true;
+    var brand = $('newBrand').value.trim(), model = $('newModel').value.trim();
+    if (!brand || !model) { err.textContent = '請輸入廠牌與型號'; err.hidden = false; return; }
+    var maxSort = S.types.reduce(function (m, v) { return Math.max(m, Number(v.sort) || 0); }, 0);
+    call('saveVehicleType', { row: { brand: brand, model: model, tierId: $('newTier').value, sort: maxSort + 1, active: true } })
       .then(function () {
-        el.newBrand.value = ''; el.newModel.value = '';
-        loadVehicles();
-      }).catch(function (err) { el.vehError.textContent = err.message; el.vehError.hidden = false; });
+        $('newBrand').value = ''; $('newModel').value = '';
+        U.toast('已新增 ' + brand + ' ' + model);
+        return loadVehicles();
+      }).catch(function (e2) { err.textContent = e2.message; err.hidden = false; });
   });
 
-  /* ---------------- 客戶 CRM ---------------- */
+  /* ============================================================
+   *  客戶 CRM
+   * ============================================================ */
 
   function loadCustomers() {
-    Api.call('getCustomers', { q: el.crmSearch.value.trim() }).then(renderCustomers);
+    return call('getCustomers', { q: $('crmSearch').value.trim() }).then(function (rows) {
+      S.customers = rows;
+      var visits = rows.reduce(function (s, c) { return s + (Number(c.visitCount) || 0); }, 0);
+      var spend = rows.reduce(function (s, c) { return s + (Number(c.totalSpend) || 0); }, 0);
+      $('crmStats').innerHTML = '<div class="stat"><b>' + rows.length + '</b>位客人</div><div class="stat"><b>' + visits + '</b>次消費</div><div class="stat"><b>' + U.money(spend) + '</b>累計金額</div>';
+      $('crmTable').querySelector('tbody').innerHTML = rows.map(function (c) {
+        return '<tr class="click" data-phone="' + U.esc(c.phone) + '"><td><b>' + U.esc(c.name) + '</b></td><td>' + U.esc(c.phone) + '</td><td>' + U.esc(c.lineId || '—') +
+          '</td><td>' + (Number(c.visitCount) || 0) + '</td><td>' + U.money(c.totalSpend || 0) + '</td><td>' + U.esc(String(c.lastOrderAt).slice(0, 16)) + '</td></tr>';
+      }).join('');
+      $('crmEmpty').hidden = rows.length > 0;
+      $('crmTable').hidden = rows.length === 0;
+    }).catch(fail);
   }
 
-  function renderCustomers(rows) {
-    var tbody = el.crmTable.querySelector('tbody');
-    tbody.innerHTML = '';
-    rows.forEach(function (c) {
-      var tr = document.createElement('tr');
-      tr.style.cursor = 'pointer';
-      tr.innerHTML =
-        '<td>' + c.phone + '</td><td>' + c.name + '</td><td>' + c.visitCount + '</td>' +
-        '<td>$' + c.totalSpend + '</td><td>' + c.lastOrderAt + '</td>';
-      tr.addEventListener('click', function () { loadHistory(c.phone); });
-      tbody.appendChild(tr);
-    });
-  }
+  var crmTimer = null;
+  $('crmSearch').addEventListener('input', function () { clearTimeout(crmTimer); crmTimer = setTimeout(loadCustomers, 250); });
 
-  var crmSearchTimer = null;
-  el.crmSearch.addEventListener('input', function () {
-    clearTimeout(crmSearchTimer);
-    crmSearchTimer = setTimeout(loadCustomers, 250);
+  $('crmTable').addEventListener('click', function (e) {
+    var tr = e.target.closest('tr[data-phone]');
+    if (tr) loadHistory(tr.dataset.phone);
   });
 
   function loadHistory(phone) {
-    Api.call('getCustomerHistory', { phone: phone }).then(function (data) {
-      var rows = data.orders.map(function (o) {
-        var vehicleText = o.vehicleBrand ? (o.vehicleBrand + ' ' + o.vehicleModel) : '待確認';
-        var priceText = o.needsPricing ? '待確認' : ('$' + o.price);
-        return '<tr><td>' + o.orderNo + '</td><td>' + o.serviceDay + '</td><td>' + vehicleText + '</td><td>' + priceText + '</td>' +
-          '<td>' + (o.status === 'ACTIVE' ? '預約中' : '已取消') + '</td></tr>';
+    call('getCustomerHistory', { phone: phone }).then(function (d) {
+      var c = d.customer || {};
+      var rows = d.orders.map(function (o) {
+        return '<tr class="click' + (o.status !== 'ACTIVE' ? ' off' : '') + '" data-open="' + U.esc(o.orderNo) + '"><td>' + U.esc(o.orderNo) + '</td><td>' + U.esc(o.serviceDay) + '</td><td>' +
+          U.esc(vehLabel(o)) + '</td><td>' + (priced(o) ? U.money(o.price) : '待報價') + '</td><td>' + stateTag(o) + '</td></tr>';
       }).join('');
-      el.crmHistory.innerHTML =
-        '<div class="card"><h3>' + (data.customer ? data.customer.name : phone) + ' 的消費紀錄</h3>' +
-        '<div class="table-scroll"><table><thead><tr><th>訂單編號</th><th>日期</th><th>車輛</th><th>金額</th><th>狀態</th></tr></thead>' +
-        '<tbody>' + rows + '</tbody></table></div></div>';
-    });
+      $('crmHistory').innerHTML =
+        '<div class="card" style="margin-top:16px"><h2>' + U.esc(c.name || phone) + ' 的消費紀錄</h2>' +
+        '<p class="hint" style="margin:4px 0 12px">' + U.esc(phone) + '　生日 ' + U.esc(c.birthday || '—') + '　共 ' + (Number(c.visitCount) || 0) + ' 次・累計 ' + U.money(c.totalSpend || 0) + '</p>' +
+        '<div class="table-scroll"><table class="data" style="min-width:520px"><thead><tr><th>訂單編號</th><th>營業日</th><th>車型</th><th>金額</th><th>狀態</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+      $('crmHistory').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      S.historyOrders = d.orders;
+    }).catch(fail);
   }
+
+  $('crmHistory').addEventListener('click', function (e) {
+    var tr = e.target.closest('tr[data-open]');
+    if (!tr) return;
+    var o = (S.historyOrders || []).filter(function (x) { return x.orderNo === tr.dataset.open; })[0];
+    if (o && !S.orders.some(function (x) { return x.orderNo === o.orderNo; })) S.orders.push(o);
+    openOrder(tr.dataset.open);
+  });
 
   /* ---------------- 啟動 ---------------- */
 
-  tryEnter();
+  var saved = safeGet();
+  if (saved && !problem) enter(saved, true); else showLogin();
 })();

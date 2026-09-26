@@ -2,38 +2,60 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>查詢 / 取消預約</title>
-<link rel="stylesheet" href="assets/style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4F1EC">
+<title>查詢 / 取消預約｜沐車所 MUCAR</title>
+<link rel="stylesheet" href="assets/style.css?v=3">
 </head>
 <body>
 
-<div class="topbar">
-  <div class="brand">查詢 / 取消預約</div>
-  <a href="index.html" class="hint">回首頁</a>
-</div>
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="index.html"><b>MUCAR</b><span>沐車所</span></a>
+    <nav class="nav">
+      <a href="index.html">回首頁</a>
+      <a class="cta" href="booking.html">立即預約</a>
+    </nav>
+  </div>
+</header>
 
-<div class="wrap">
-  <div id="errorBox" class="error-box" hidden></div>
+<main class="wrap" style="padding-bottom:40px">
+  <div id="configBanner" class="alert alert-danger" hidden></div>
+  <div id="errorBox" class="alert alert-danger" role="alert" hidden></div>
 
-  <section class="card">
+  <section class="panel">
     <h2>查詢我的預約</h2>
-    <label>聯絡電話 *</label>
-    <input id="fPhone" type="tel" inputmode="numeric" placeholder="0912345678">
-    <label>訂單編號 *</label>
-    <input id="fOrderNo" type="text" placeholder="例如 20260926-001">
-    <div class="btn-row"><button class="btn-primary" id="searchBtn">查詢</button></div>
+    <p class="desc">輸入預約時填寫的電話與訂單編號。</p>
+    <div class="field">
+      <label for="fPhone">聯絡電話</label>
+      <input id="fPhone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="14" placeholder="0912345678">
+    </div>
+    <div class="field">
+      <label for="fOrderNo">訂單編號</label>
+      <input id="fOrderNo" type="text" autocomplete="off" maxlength="20" placeholder="例如 20260926-001">
+    </div>
+    <div class="btn-row" style="margin-top:18px">
+      <button class="btn btn-primary btn-block" id="searchBtn" type="button">查詢</button>
+    </div>
   </section>
 
   <div id="resultArea"></div>
+</main>
 
-  <div class="btn-row">
-    <button class="btn-danger" id="cancelBtn" hidden>取消這筆預約</button>
+<div id="cancelModal" class="modal-mask" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="cancelTitle">
+    <h3 id="cancelTitle">確定要取消這筆預約嗎？</h3>
+    <p id="cancelText"></p>
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="cancelNo" type="button">先不要</button>
+      <button class="btn btn-danger" id="cancelYes" type="button">確定取消</button>
+    </div>
   </div>
 </div>
 
-<script src="assets/config.js"></script>
-<script src="assets/api.js"></script>
-<script src="assets/lookup.js"></script>
+<script src="assets/config.js?v=3"></script>
+<script src="assets/util.js?v=3"></script>
+<script src="assets/api.js?v=3"></script>
+<script src="assets/lookup.js?v=3"></script>
 </body>
 </html>

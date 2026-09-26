@@ -2,120 +2,237 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>線上預約</title>
-<link rel="stylesheet" href="assets/style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4F1EC">
+<title>線上預約｜沐車所 MUCAR</title>
+<link rel="stylesheet" href="assets/style.css?v=3">
 </head>
 <body>
 
-<div class="topbar">
-  <div class="brand">線上預約洗車</div>
-  <a href="index.html" class="hint">回首頁</a>
-</div>
-
-<div class="wrap">
-
-  <div class="steps">
-    <div class="step-dot active" data-step="1">基本資料</div>
-    <div class="step-dot" data-step="2">選車</div>
-    <div class="step-dot" data-step="3">時段</div>
-    <div class="step-dot" data-step="4">付款</div>
-    <div class="step-dot" data-step="5">完成</div>
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="index.html"><b>MUCAR</b><span>沐車所</span></a>
+    <nav class="nav">
+      <a href="lookup.html">查詢預約</a>
+      <a href="index.html">回首頁</a>
+    </nav>
   </div>
+</header>
 
-  <div id="errorBox" class="error-box" hidden></div>
+<main class="wrap">
 
-  <section id="step1" class="card">
+  <ol class="stepper" id="stepper">
+    <li data-n="1" class="active">基本資料</li>
+    <li data-n="2">選擇車型</li>
+    <li data-n="3">地址時段</li>
+    <li data-n="4">付款方式</li>
+    <li data-n="5">確認送出</li>
+  </ol>
+
+  <div id="configBanner" class="alert alert-danger" hidden></div>
+  <div id="errorBox" class="alert alert-danger" role="alert" hidden></div>
+  <div id="summary" class="summary" hidden></div>
+
+  <!-- Step 1 -->
+  <section id="step1" class="panel">
     <h2>基本資料</h2>
-    <label>姓名 *</label>
-    <input id="fName" type="text" placeholder="您的姓名">
-    <label>生日</label>
-    <input id="fBirthday" type="date">
-    <label>聯絡電話 *</label>
-    <input id="fPhone" type="tel" inputmode="numeric" placeholder="0912345678">
-    <label>LINE 帳號</label>
-    <input id="fLine" type="text" placeholder="選填">
-    <label>備註</label>
-    <textarea id="fNote" placeholder="選填"></textarea>
-    <div class="btn-row"><button class="btn-primary" id="toStep2">下一步</button></div>
-  </section>
+    <p class="desc">留下聯絡方式，店家確認後會透過官方 LINE 或電話與您聯繫。</p>
 
-  <section id="step2" class="card" hidden>
-    <h2>選擇車輛</h2>
-    <label>廠牌 / 車型 *</label>
-    <select id="fVehicle"><option value="">請選擇...</option></select>
-    <div id="vehiclePreview" class="hint"></div>
-    <div class="btn-row">
-      <button class="btn-secondary" id="back2">上一步</button>
-      <button class="btn-primary" id="toStep3">下一步</button>
+    <div class="field">
+      <label for="fName">姓名<span class="req">*</span></label>
+      <input id="fName" type="text" autocomplete="name" maxlength="40" placeholder="您的姓名">
+      <div class="field-err" id="errName" hidden></div>
+    </div>
+    <div class="field">
+      <label for="fPhone">聯絡電話<span class="req">*</span></label>
+      <input id="fPhone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="14" placeholder="0912345678">
+      <div class="field-err" id="errPhone" hidden></div>
+      <div class="hint">之後查詢或取消預約時，需要用這支電話。</div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label for="fBirthday">生日</label>
+        <input id="fBirthday" type="date" autocomplete="bday">
+      </div>
+      <div class="field">
+        <label for="fLine">LINE 帳號</label>
+        <input id="fLine" type="text" maxlength="60" placeholder="選填">
+      </div>
+    </div>
+    <div class="field">
+      <label for="fNote">備註</label>
+      <textarea id="fNote" maxlength="500" placeholder="選填，例如：想加強的部位、車子特殊狀況"></textarea>
     </div>
   </section>
 
-  <section id="step3" class="card" hidden>
-    <h2>選擇預約時段</h2>
-    <p class="hint">營業時間 12:00 – 凌晨 03:00，每筆預約會佔用一段時間，請選擇一個起始時間。</p>
-    <label>預約日期 *</label>
-    <input id="fDate" type="date">
+  <!-- Step 2 -->
+  <section id="step2" class="panel" hidden>
+    <h2>選擇車型</h2>
+    <p class="desc">系統會依車型自動判定級距與價格。</p>
+
+    <div id="vehLoading" class="hint">載入車型資料中…</div>
+    <div id="vehFail" class="alert alert-danger" hidden>
+      <div id="vehFailMsg">無法載入車型資料。</div>
+      <button class="btn btn-secondary btn-sm" id="vehRetry" type="button">重新載入</button>
+    </div>
+
+    <div id="vehForm" hidden>
+      <div class="field">
+        <label for="fBrand">廠牌<span class="req">*</span></label>
+        <select id="fBrand"></select>
+      </div>
+      <div class="field" id="modelField">
+        <label for="fModel">車型<span class="req">*</span></label>
+        <select id="fModel" disabled><option value="">請先選擇廠牌</option></select>
+      </div>
+      <div class="field" id="otherField" hidden>
+        <label for="fOther">您的車款<span class="req">*</span></label>
+        <input id="fOther" type="text" maxlength="60" placeholder="例如：Toyota Camry 2021">
+        <div class="hint">找不到沒關係，店家會確認車型與價格後通知您。</div>
+      </div>
+
+      <div class="price-preview" id="pricePreview" hidden>
+        <div>
+          <div class="tier" id="ppTier"></div>
+          <div class="big" id="ppPrice"></div>
+        </div>
+        <div class="hint" style="margin:0;max-width:240px">洗車費用參考價；牽車費用依實際距離評估，由店家確認後通知。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Step 3 -->
+  <section id="step3" class="panel" hidden>
+    <h2>牽車地址與預約時段</h2>
+    <p class="desc">專員會到您指定的地點牽車，完工後送回原處。</p>
+
+    <div class="field">
+      <label for="fAddress">牽車地址<span class="req">*</span></label>
+      <textarea id="fAddress" maxlength="200" placeholder="縣市、路名、門牌，並註明樓層或停車位置"></textarea>
+      <div class="field-err" id="errAddress" hidden></div>
+      <div class="hint">預設原處交車；若要送回其他地點，請寫在上一頁的備註。</div>
+    </div>
+
+    <div class="field">
+      <label class="lbl">預約日期<span class="req">*</span></label>
+      <div class="dates" id="dates"></div>
+    </div>
+
     <div id="slotArea"></div>
-    <div class="btn-row">
-      <button class="btn-secondary" id="back3">上一步</button>
-      <button class="btn-primary" id="toStep4" disabled>下一步</button>
-    </div>
+    <div class="picked" id="picked" hidden></div>
   </section>
 
-  <section id="step4" class="card" hidden>
+  <!-- Step 4 -->
+  <section id="step4" class="panel" hidden>
     <h2>付款方式</h2>
-    <div class="radio-row">
-      <label class="radio-card"><input type="radio" name="payment" value="transfer"> 匯款</label>
-      <label class="radio-card"><input type="radio" name="payment" value="onsite"> 現場付款</label>
+    <p class="desc">預約成立後，店家會確認服務距離與時間。</p>
+
+    <div class="choice" id="payChoice">
+      <label id="payTransferLabel">
+        <input type="radio" name="payment" value="transfer">
+        <div><b>匯款</b><span>先匯款，並把匯款通知貼到官方 LINE 給店家核對。</span></div>
+      </label>
+      <label id="payOnsiteLabel">
+        <input type="radio" name="payment" value="onsite">
+        <div><b>現場付款</b><span>交車時當面結帳。</span></div>
+      </label>
     </div>
 
-    <div id="transferFields" hidden>
-      <p class="hint">請匯款至：<strong id="bankAccountText"></strong></p>
-      <label>匯款日期 *</label>
-      <input id="fTransferDate" type="date">
-      <label>轉出帳號末五碼 *</label>
-      <input id="fLast5" type="text" inputmode="numeric" maxlength="5" placeholder="5 碼數字">
-      <p class="hint">送出後畫面會產生一段通知文字，請複製貼到官方 LINE 給店家核對。</p>
-    </div>
-
-    <div class="btn-row">
-      <button class="btn-secondary" id="back4">上一步</button>
-      <button class="btn-primary" id="submitOrder">送出預約</button>
+    <div id="transferFields" hidden style="margin-top:18px">
+      <label class="lbl">收款帳號</label>
+      <div class="bank">
+        <b id="bankAccount"></b>
+        <button class="btn btn-secondary btn-sm" id="copyBank" type="button">複製帳號</button>
+      </div>
+      <div class="hint" id="bankHint" style="margin-bottom:14px"></div>
+      <div class="row2">
+        <div class="field" style="margin-top:0">
+          <label for="fTransferDate">匯款日期<span class="req">*</span></label>
+          <input id="fTransferDate" type="date">
+        </div>
+        <div class="field" style="margin-top:0">
+          <label for="fLast5">轉出帳號末五碼<span class="req">*</span></label>
+          <input id="fLast5" type="text" inputmode="numeric" maxlength="5" placeholder="12345" autocomplete="off">
+        </div>
+      </div>
+      <div class="field-err" id="errTransfer" hidden></div>
+      <div class="hint">送出預約後，畫面會產生一段匯款通知，請複製貼到官方 LINE。</div>
     </div>
   </section>
 
-  <section id="step5" class="card" hidden>
-    <h2>預約完成</h2>
-    <div class="success-box">預約已送出！</div>
-    <div id="summaryArea"></div>
+  <!-- Step 5 -->
+  <section id="step5" class="panel" hidden>
+    <h2>確認預約內容</h2>
+    <p class="desc">請再確認一次，送出後時段會立即為您保留。</p>
+    <table class="kv" id="reviewTable"></table>
 
-    <div id="transferNoticeArea" hidden>
-      <h3>匯款通知（請複製貼到官方 LINE）</h3>
+    <details class="notice">
+      <summary>服務須知與代客牽車注意事項</summary>
+      <div class="inner">
+        <ol class="flow" id="noticeFlow"></ol>
+        <div class="tips" id="noticeTips"></div>
+      </div>
+    </details>
+
+    <label class="agree">
+      <input type="checkbox" id="fAgree">
+      <span>我已閱讀並同意上述服務須知與代客牽車注意事項，並了解牽車費用將依實際距離評估、由店家確認後通知。</span>
+    </label>
+  </section>
+
+  <!-- 完成 -->
+  <section id="stepDone" class="panel center" hidden>
+    <div class="done-icon">&#10003;</div>
+    <h2>預約已送出</h2>
+    <div class="orderno" id="doneOrderNo"></div>
+    <p>請截圖或記下訂單編號，查詢或取消預約時需要用到。</p>
+
+    <table class="kv" id="doneTable" style="text-align:left;margin-top:16px"></table>
+
+    <div id="transferNoticeArea" hidden style="text-align:left;margin-top:20px">
+      <h3>下一步：把匯款通知貼到官方 LINE</h3>
       <div class="notice-block" id="noticeText"></div>
-      <button class="btn-secondary" id="copyNotice">複製文字</button>
+      <div class="btn-row">
+        <button class="btn btn-secondary btn-sm" id="copyNotice" type="button">複製通知文字</button>
+      </div>
     </div>
 
-    <div class="btn-row">
-      <a class="btn btn-primary" id="lineLink" href="#" target="_blank">前往官方 LINE</a>
+    <ol class="next-steps" style="text-align:left">
+      <li>店家會確認服務距離與時間，並透過官方 LINE 發送專員姓名與聯絡資訊給您。</li>
+      <li>專員抵達後會出示身份，並與您一起環車確認車況。</li>
+      <li>如需變更或取消，請至「查詢 / 取消預約」，或直接在官方 LINE 聯繫店家。</li>
+    </ol>
+
+    <div class="btn-row" style="margin-top:22px;justify-content:center">
+      <a class="btn btn-line" id="lineLink" href="#" target="_blank" rel="noopener">前往官方 LINE</a>
+      <a class="btn btn-secondary" href="lookup.html">查詢 / 取消預約</a>
     </div>
   </section>
 
+</main>
+
+<div class="actionbar" id="actionbar">
+  <div class="actionbar-in">
+    <button class="btn btn-secondary" id="btnBack" type="button" hidden>上一步</button>
+    <button class="btn btn-primary" id="btnNext" type="button">下一步</button>
+  </div>
 </div>
 
 <div id="dupModal" class="modal-mask" hidden>
-  <div class="modal-box">
-    <h3>您已經有一筆預約</h3>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="dupTitle">
+    <h3 id="dupTitle">您已經有進行中的預約</h3>
     <p id="dupText"></p>
     <div class="btn-row">
-      <button class="btn-secondary" id="dupCancel">取消</button>
-      <button class="btn-primary" id="dupConfirm">仍要建立新的預約</button>
+      <button class="btn btn-secondary" id="dupCancel" type="button">先不要</button>
+      <button class="btn btn-primary" id="dupConfirm" type="button">仍要再預約一筆</button>
     </div>
   </div>
 </div>
 
-<script src="assets/config.js"></script>
-<script src="assets/api.js"></script>
-<script src="assets/booking.js"></script>
+<script src="assets/config.js?v=3"></script>
+<script src="assets/util.js?v=3"></script>
+<script src="assets/api.js?v=3"></script>
+<script src="assets/content.js?v=3"></script>
+<script src="assets/booking.js?v=3"></script>
 </body>
 </html>
