@@ -8,7 +8,7 @@
 <title>店家後台｜沐車所 MUCAR</title>
 <link rel="preconnect" href="https://script.google.com" crossorigin>
 <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
-<link rel="stylesheet" href="assets/style.css?v=5">
+<link rel="stylesheet" href="assets/style.css?v=6">
 </head>
 <body>
 
@@ -226,6 +226,15 @@
         <li>上面的收件信箱會被加為行程參與者（不會寄邀請信），所以主要信箱的日曆也看得到</li>
       </ul>
       <div class="field" style="margin-top:16px">
+        <label for="ntCalGuests">日曆共享對象（選填，一行一個 Gmail，最多 10 位）</label>
+        <textarea id="ntCalGuests" rows="3" placeholder="boss@gmail.com&#10;driver1@gmail.com" style="min-height:84px" autocapitalize="none" spellcheck="false"></textarea>
+        <div class="hint" id="ntGuestHint">每筆<b>新預約</b>都會自動出現在他們的 Google 日曆裡（不會寄邀請信），適合老闆與日後負責牽車的專員。</div>
+        <details class="range" style="margin-top:4px">
+          <summary>怎麼讓某個人看到「整個日曆」（包含以前的）？</summary>
+          <div class="hint" style="padding-bottom:10px">用<b>建立日曆的那個 Google 帳號</b>開 Google 日曆 → 左側「我的日曆」→ 點「沐車所預約」旁的「⋮」→「設定與共用」→「與特定使用者共用」→ 加入對方 Gmail，權限選「查看所有活動詳細資訊」或「進行變更」。對方就會在自己的日曆看到整份，之後自動同步。<br>想讓老闆的帳號當日曆主人：請老闆用自己的帳號建立一個日曆，共用給部署 Apps Script 的帳號並給「進行變更」，再把該日曆 ID 貼到下面「使用哪一個日曆」。</div>
+        </details>
+      </div>
+      <div class="field" style="margin-top:16px">
         <label for="ntCalId">使用哪一個日曆（選填）</label>
         <input id="ntCalId" type="text" placeholder="留空 = 自動建立並使用專用日曆「沐車所預約」" autocapitalize="none" autocorrect="off" spellcheck="false">
         <div class="hint">想改用自己原本的日曆，貼上該日曆的 ID：Google 日曆 → 該日曆「設定與共用」→「整合日曆」→「日曆 ID」（主要日曆的 ID 就是 Gmail 信箱）。日曆必須屬於<b>部署 Apps Script 的那個帳號</b>，或已分享給那個帳號並給「進行變更」權限。改完按上方「儲存設定」。</div>
@@ -304,9 +313,9 @@
   </div>
 </div>
 
-<script src="assets/config.js?v=5"></script>
-<script src="assets/util.js?v=5"></script>
-<script src="assets/api.js?v=5"></script>
-<script src="assets/admin.js?v=5"></script>
+<script src="assets/config.js?v=6"></script>
+<script src="assets/util.js?v=6"></script>
+<script src="assets/api.js?v=6"></script>
+<script src="assets/admin.js?v=6"></script>
 </body>
 </html>

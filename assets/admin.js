@@ -7,7 +7,7 @@
   function safeGet() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
   function safeSet(v) { try { v ? localStorage.setItem(KEY_STORE, v) : localStorage.removeItem(KEY_STORE); } catch (e) { /* 無痕模式等 */ } }
 
-  var REQUIRED_BACKEND = 8;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
+  var REQUIRED_BACKEND = 9;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
   var S = { calMode: 'auto', orders: [], tiers: [], types: [], customers: [], open: null, closures: [] };
 
   /* ---------------- 呼叫後端（密碼失效時自動回登入畫面） ---------------- */
@@ -523,6 +523,11 @@
     $('ntQuota').textContent = st.quota == null ? '—' : st.quota + ' 封';
     $('ntCalName').textContent = st.calendarName || '沐車所預約';
     $('ntCalId').value = st.calendarId || '';
+    $('ntCalGuests').value = (st.calendarGuests || []).join('\n');
+    $('ntGuestHint').innerHTML = (st.calendarGuestsCustom
+      ? '目前使用你自訂的名單。'
+      : '目前還沒自訂，暫時沿用上面的「Email 收件信箱」。') +
+      ' 每筆<b>新預約</b>都會自動出現在他們的 Google 日曆裡（不會寄邀請信），適合老闆與日後負責牽車的專員；已經建立的舊行程不會改變。';
     $('ntCalWhere').textContent = '日曆「' + (st.calendarName || '沐車所預約') + '」' +
       (st.calendarId ? '（你指定的日曆）' : '（系統自動建立）') + '，在 ' + (st.sender || '部署 Apps Script 的 Google 帳號') +
       ' 的 Google 日曆裡（電腦版左側「我的日曆」）';
@@ -553,7 +558,8 @@
       emails: $('ntEmails').value,
       notifyEnabled: $('ntMailOn').checked,
       calendarMode: (document.querySelector('input[name="calMode"]:checked') || {}).value || 'auto',
-      calendarId: $('ntCalId').value.trim()
+      calendarId: $('ntCalId').value.trim(),
+      calendarGuests: $('ntCalGuests').value
     }).then(function (st) { showNotify(st); U.toast('通知設定已儲存'); if (S.open) refreshOpen(); })
       .catch(function (err) { $('ntError').textContent = err.message; $('ntError').hidden = false; })
       .then(function () { $('ntSave').disabled = false; });
