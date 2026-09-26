@@ -149,8 +149,10 @@ select:disabled, input:disabled { background: var(--bg-2); color: var(--ink-3); 
 textarea { resize: vertical; min-height: 84px; }
 .hint { font-size: 12.5px; color: var(--ink-3); margin-top: 6px; }
 .field-err { font-size: 12.5px; color: var(--danger); margin-top: 6px; }
-.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-@media (max-width: 520px) { .row2 { grid-template-columns: 1fr; } }
+.row2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.row2 > *, .field { min-width: 0; }
+.field + .row2, .row2 + .field { margin-top: 16px; }
+@media (max-width: 520px) { .row2 { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- 按鈕 ---------- */
 .btn, button.btn {
@@ -492,3 +494,22 @@ details.range .row2 { margin-top: 4px; }
 
 /* iOS 的日期/時間欄位預設比較矮，統一高度 */
 input[type="date"], input[type="time"] { min-height: 48px; }
+
+/* ---------- 日期欄位（生日）：iOS Safari 等會無視 width:100%，讓外框超出卡片；統一成一般輸入框的盒模型 ---------- */
+input, select, textarea { max-width: 100%; }
+input[type="date"], input[type="time"] {
+  -webkit-appearance: none; appearance: none;
+  display: block; width: 100%; min-width: 0; max-width: 100%;
+  text-align: left; line-height: 1.4;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236E6A61' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='18' rx='2'/><path d='M16 2v4M8 2v4M3 10h18'/></svg>");
+  background-repeat: no-repeat; background-position: right 14px center; padding-right: 42px;
+}
+input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 1.4em; }
+input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0; position: absolute; right: 0; width: 44px; height: 100%; cursor: pointer; }
+input[type="date"], input[type="time"] { position: relative; }
+
+/* ---------- 載入中骨架、加入行事曆區塊 ---------- */
+.slot-skel { height: 132px; border-radius: var(--radius-s); background: linear-gradient(90deg, var(--bg-2), var(--panel), var(--bg-2)); background-size: 200% 100%; animation: sk 1.2s infinite; margin-top: 14px; }
+.cal-add { margin-top: 22px; padding: 16px 18px; border: 1px dashed var(--gray-d); border-radius: var(--radius-s); background: #fff; text-align: left; }
+.cal-add h3 { margin-bottom: 4px; }
+.cal-add .btn-row { margin-top: 12px; }

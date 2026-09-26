@@ -40,6 +40,10 @@
       '</table>';
 
     if (state === 'ACTIVE') {
+      html += '<div class="cal-add" style="margin-top:16px"><h3>加入我的行事曆（選填）</h3>' +
+        '<p class="hint">只會加到你自己的日曆，不會寄任何邀請信。</p>' +
+        '<div class="btn-row"><a class="btn btn-secondary btn-sm" id="calGoogle" href="#" target="_blank" rel="noopener">加入 Google 日曆</a>' +
+        '<button class="btn btn-secondary btn-sm" id="calIcs" type="button">加入 Apple / 其他日曆 (.ics)</button></div></div>';
       html += '<div class="btn-row" style="margin-top:18px">' +
         '<button class="btn btn-danger btn-block" id="cancelBtn" type="button">取消這筆預約</button></div>' +
         '<p class="hint" style="margin-top:10px">取消後時段會立即釋放；若已到預約時間或需要更改內容，請直接聯繫官方 LINE。</p>';
@@ -48,6 +52,10 @@
     }
     html += '<div class="btn-row" style="margin-top:14px"><a class="btn btn-line btn-block" href="' + U.esc(CFG.LINE_OA_URL) + '" target="_blank" rel="noopener">聯繫官方 LINE</a></div></section>';
     $('resultArea').innerHTML = html;
+    if (state === 'ACTIVE' && $('calGoogle')) {
+      $('calGoogle').href = U.googleCalUrl(o);
+      $('calIcs').onclick = function () { U.downloadIcs(o); };
+    }
   }
 
   function search() {

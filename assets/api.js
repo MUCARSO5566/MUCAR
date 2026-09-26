@@ -35,6 +35,8 @@
   var READS = ['ping', 'bootBooking', 'checkAvailability', 'checkPhoneActive', 'lookupOrder',
     'listOrders', 'listRows', 'getCustomers', 'getCustomerHistory'];
 
+  var lastServerMs;
+
   function parse(text) {
     var data;
     try {
@@ -47,6 +49,7 @@
       err.retryable = true;   // Google 偶爾會臨時回一頁 HTML 錯誤頁
       throw err;
     }
+    lastServerMs = data.ms;
     if (!data.ok) throw new Error(data.error || '未知錯誤');
     return data.data;
   }
@@ -79,10 +82,29 @@
       }
 
       var canRetry = READS.indexOf(action) >= 0;
+      var t0 = Date.now();
       return send().catch(function (err) {
         if (!(canRetry && err.retryable)) throw err;
         return new Promise(function (r) { setTimeout(r, 900); }).then(send);
+      }).then(function (data) {
+        // 想知道慢在哪：開瀏覽器的開發人員工具 → Console，可以看到每個請求「總共花多久 / Apps Script 本身花多久」
+        if (window.console && console.debug) console.debug('[api] ' + action + '：總共 ' + (Date.now() - t0) + ' ms，後端執行 ' + (lastServerMs == null ? '?' : lastServerMs) + ' ms');
+        return data;
       });
+    },
+
+    /** 送出後不等回應、也不管成功與否（例如：預約成功後叫後端去處理排隊中的通知信）；keepalive 讓使用者關掉頁面請求也會送完 */
+    fire: function (action, payload) {
+      if (configProblem()) return;
+      try {
+        fetch(CFG.API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(Object.assign({}, payload || {}, { action: action, key: this.key })),
+          redirect: 'follow',
+          keepalive: true
+        }).catch(function () { /* 忽略 */ });
+      } catch (e) { /* 忽略 */ }
     }
   };
 

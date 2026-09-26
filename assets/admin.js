@@ -7,7 +7,7 @@
   function safeGet() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
   function safeSet(v) { try { v ? localStorage.setItem(KEY_STORE, v) : localStorage.removeItem(KEY_STORE); } catch (e) { /* 無痕模式等 */ } }
 
-  var REQUIRED_BACKEND = 7;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
+  var REQUIRED_BACKEND = 8;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
   var S = { calMode: 'auto', orders: [], tiers: [], types: [], customers: [], open: null, closures: [] };
 
   /* ---------------- 呼叫後端（密碼失效時自動回登入畫面） ---------------- */
@@ -522,6 +522,12 @@
     $('ntSenderName').textContent = st.senderName || '';
     $('ntQuota').textContent = st.quota == null ? '—' : st.quota + ' 封';
     $('ntCalName').textContent = st.calendarName || '沐車所預約';
+    $('ntCalId').value = st.calendarId || '';
+    $('ntCalWhere').textContent = '日曆「' + (st.calendarName || '沐車所預約') + '」' +
+      (st.calendarId ? '（你指定的日曆）' : '（系統自動建立）') + '，在 ' + (st.sender || '部署 Apps Script 的 Google 帳號') +
+      ' 的 Google 日曆裡（電腦版左側「我的日曆」）';
+    $('ntQueue').textContent = '待處理 ' + (st.pending || 0) + ' 筆；每分鐘備援排程' + (st.triggerOn ? '已啟用' : '尚未啟用（在 Apps Script 執行一次 authorizeNotifications 即可啟用）');
+    if (st.pending > 0) Api.fire('processNotify', {});
     $('ntCalState').textContent = st.calendarReady ? '已建立，運作中' : '尚未建立（收到第一筆預約或按「測試日曆連線」時會自動建立）';
     var le = $('ntLastError');
     if (st.lastError) {
@@ -546,7 +552,8 @@
     call('saveNotifySettings', {
       emails: $('ntEmails').value,
       notifyEnabled: $('ntMailOn').checked,
-      calendarMode: (document.querySelector('input[name="calMode"]:checked') || {}).value || 'auto'
+      calendarMode: (document.querySelector('input[name="calMode"]:checked') || {}).value || 'auto',
+      calendarId: $('ntCalId').value.trim()
     }).then(function (st) { showNotify(st); U.toast('通知設定已儲存'); if (S.open) refreshOpen(); })
       .catch(function (err) { $('ntError').textContent = err.message; $('ntError').hidden = false; })
       .then(function () { $('ntSave').disabled = false; });

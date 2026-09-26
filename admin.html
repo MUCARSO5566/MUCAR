@@ -6,7 +6,9 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#F4F1EC">
 <title>店家後台｜沐車所 MUCAR</title>
-<link rel="stylesheet" href="assets/style.css?v=4">
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="stylesheet" href="assets/style.css?v=5">
 </head>
 <body>
 
@@ -223,7 +225,14 @@
         <li>後台核對、改金額、加備註時行程會同步更新；預約取消時行程自動刪除</li>
         <li>上面的收件信箱會被加為行程參與者（不會寄邀請信），所以主要信箱的日曆也看得到</li>
       </ul>
-      <div class="hint" style="margin-top:10px">日曆狀態：<b id="ntCalState">—</b></div>
+      <div class="field" style="margin-top:16px">
+        <label for="ntCalId">使用哪一個日曆（選填）</label>
+        <input id="ntCalId" type="text" placeholder="留空 = 自動建立並使用專用日曆「沐車所預約」" autocapitalize="none" autocorrect="off" spellcheck="false">
+        <div class="hint">想改用自己原本的日曆，貼上該日曆的 ID：Google 日曆 → 該日曆「設定與共用」→「整合日曆」→「日曆 ID」（主要日曆的 ID 就是 Gmail 信箱）。日曆必須屬於<b>部署 Apps Script 的那個帳號</b>，或已分享給那個帳號並給「進行變更」權限。改完按上方「儲存設定」。</div>
+      </div>
+      <div class="hint" style="margin-top:10px">目前使用的日曆：<b id="ntCalWhere">—</b></div>
+      <div class="hint" style="margin-top:4px">日曆狀態：<b id="ntCalState">—</b></div>
+      <div class="hint" style="margin-top:4px">背景通知：<b id="ntQueue">—</b></div>
       <div class="hint">「測試日曆連線」只是給你確認用：會在你的日曆建立一筆測試行程並立刻刪除，用來確認系統有權限寫入日曆，跟客人無關。</div>
       <div class="btn-row" style="margin-top:16px">
         <button class="btn btn-secondary btn-sm" id="ntTestCal" type="button">測試日曆連線</button>
@@ -295,9 +304,9 @@
   </div>
 </div>
 
-<script src="assets/config.js?v=4"></script>
-<script src="assets/util.js?v=4"></script>
-<script src="assets/api.js?v=4"></script>
-<script src="assets/admin.js?v=4"></script>
+<script src="assets/config.js?v=5"></script>
+<script src="assets/util.js?v=5"></script>
+<script src="assets/api.js?v=5"></script>
+<script src="assets/admin.js?v=5"></script>
 </body>
 </html>

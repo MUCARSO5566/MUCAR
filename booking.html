@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F4F1EC">
 <title>線上預約｜沐車所 MUCAR</title>
-<link rel="stylesheet" href="assets/style.css?v=4">
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="stylesheet" href="assets/style.css?v=5">
 </head>
 <body>
 
@@ -185,6 +187,8 @@
       </div>
     </details>
 
+    <div class="alert alert-warn" id="submitHint" style="margin-top:14px" hidden>預約處理中，約需 3～6 秒，請不要關閉或重新整理頁面。</div>
+
     <label class="agree" id="agreeBox">
       <input type="checkbox" id="fAgree">
       <span>我已閱讀並同意上述服務須知與代客牽車注意事項，並了解牽車費用將依實際距離評估、由店家確認後通知。</span>
@@ -214,6 +218,15 @@
       <li>如需變更或取消，請至「查詢 / 取消預約」，或直接在官方 LINE 聯繫店家。</li>
     </ol>
 
+    <div class="cal-add" id="calBox">
+      <h3>加入我的行事曆（選填）</h3>
+      <p class="hint">想在自己的手機收到提醒，可以把這筆預約加進行事曆；不加也沒關係。這只會加到<b>你自己</b>的日曆，<b>不會寄任何邀請信</b>給你或任何人。</p>
+      <div class="btn-row">
+        <a class="btn btn-secondary btn-sm" id="calGoogle" href="#" target="_blank" rel="noopener">加入 Google 日曆</a>
+        <button class="btn btn-secondary btn-sm" id="calIcs" type="button">加入 Apple / 其他日曆 (.ics)</button>
+      </div>
+    </div>
+
     <div class="btn-row" style="margin-top:22px;justify-content:center">
       <a class="btn btn-line" id="lineLink" href="#" target="_blank" rel="noopener">前往官方 LINE</a>
       <a class="btn btn-secondary" href="lookup.html">查詢 / 取消預約</a>
@@ -240,10 +253,10 @@
   </div>
 </div>
 
-<script src="assets/config.js?v=4"></script>
-<script src="assets/util.js?v=4"></script>
-<script src="assets/api.js?v=4"></script>
-<script src="assets/content.js?v=4"></script>
-<script src="assets/booking.js?v=4"></script>
+<script src="assets/config.js?v=5"></script>
+<script src="assets/util.js?v=5"></script>
+<script src="assets/api.js?v=5"></script>
+<script src="assets/content.js?v=5"></script>
+<script src="assets/booking.js?v=5"></script>
 </body>
 </html>

@@ -15,9 +15,14 @@
     vehicle: null,          // 車種物件，或 { id: 'OTHER' }
     otherTier: '',          // 「找不到我的車」時客人自選的車型級距 id（空 = 由店家判斷）
     day: '', slot: null, avail: null, availSeq: 0,
-    payment: '', order: null, mapActive: false, draftVehicle: ''
+    payment: '', order: null, mapActive: false, draftVehicle: '',
+    availCache: {},         // day -> { t: 取得時間, p: Promise }；預先載入 / 短時間內重複點日期不用再等
+    dup: null               // { phone, p }；預先做好的「重複預約」檢查
   };
   var DRAFT_KEY = 'mucar_booking_draft';
+  var BOOT_KEY = 'mucar_boot_cache';
+  var BOOT_MAX_AGE = 12 * 3600 * 1000;      // 車型資料很少變，先用手機上的舊資料立刻顯示，背景再更新
+  var AVAIL_TTL = 40 * 1000;
 
   /* ---------------- 共用 ---------------- */
 
@@ -159,20 +164,52 @@
       $('configBanner').hidden = false;
     }
 
-    return Api.call('bootBooking', {}).then(function (data) {
-      S.tiers = data.tiers || [];
-      S.types = (data.vehicleTypes || []).filter(function (v) { return !!tierOf(v); });
-      if (!S.types.length) throw new Error('目前沒有可選的車種，請聯絡店家。');
-      S.loaded = true;
-      renderVehicles();
+    var cached = readBootCache();
+    var shown = false;
+    if (cached && applyBoot(cached)) {           // 有舊資料：立刻顯示，不用等 Apps Script
+      shown = true;
       $('vehLoading').hidden = true;
       $('vehForm').hidden = false;
+    }
+
+    return Api.call('bootBooking', {}).then(function (data) {
+      if (!applyBoot(data)) throw new Error('目前沒有可選的車種，請聯絡店家。');
+      writeBootCache(data);
+      $('vehLoading').hidden = true;
+      $('vehFail').hidden = true;
+      $('vehForm').hidden = false;
     }).catch(function (err) {
+      if (shown) return;                           // 已經用舊資料顯示了，背景更新失敗就先不打擾
       S.loaded = false;
       $('vehLoading').hidden = true;
       $('vehFailMsg').textContent = '無法載入車種資料：' + err.message;
       $('vehFail').hidden = false;
     });
+  }
+
+  function readBootCache() {
+    try {
+      var c = JSON.parse(localStorage.getItem(BOOT_KEY) || 'null');
+      return (c && c.data && Date.now() - c.t < BOOT_MAX_AGE) ? c.data : null;
+    } catch (e) { return null; }
+  }
+  function writeBootCache(data) {
+    try { localStorage.setItem(BOOT_KEY, JSON.stringify({ t: Date.now(), data: data })); } catch (e) { /* ignore */ }
+  }
+
+  /** 套用車型資料；有內容回傳 true。資料沒變就不重畫，避免客人正在選的時候選單被重整 */
+  function applyBoot(data) {
+    var tiers = data.tiers || [];
+    var types = (data.vehicleTypes || []);
+    var sig = JSON.stringify([tiers, types]);
+    if (S.bootSig === sig) return true;
+    S.tiers = tiers;
+    S.types = types.filter(function (v) { return !!tierOf(v); });
+    if (!S.types.length) return false;
+    S.bootSig = sig;
+    S.loaded = true;
+    renderVehicles();
+    return true;
   }
 
   function renderVehicles() {
@@ -319,9 +356,9 @@
     $('picked').hidden = true;
     renderDates();
     var seq = ++S.availSeq;
-    $('slotArea').innerHTML = '<p class="hint">載入時段中…</p>';
+    $('slotArea').innerHTML = '<div class="slot-skel" aria-hidden="true"></div><p class="hint">載入時段中…（第一次約需 2～4 秒）</p>';
 
-    Api.call('checkAvailability', { serviceDay: day }).then(function (data) {
+    getAvail(day).then(function (data) {
       if (seq !== S.availSeq) return;
       S.avail = data;
       renderSlots();
@@ -330,6 +367,19 @@
       $('slotArea').innerHTML = '<div class="alert alert-danger">無法載入時段：' + U.esc(err.message) +
         '<br><button type="button" class="btn btn-secondary btn-sm" id="slotRetry">重新載入</button></div>';
     });
+  }
+
+  /** 取得某天的空檔；短時間內同一天重複取用，或已經預先載入的，就不用再等 Apps Script */
+  function getAvail(day, fresh) {
+    var c = S.availCache[day];
+    if (!fresh && c && Date.now() - c.t < AVAIL_TTL) return c.p;
+    var entry = { t: Date.now() };
+    entry.p = Api.call('checkAvailability', { serviceDay: day }).catch(function (err) {
+      if (S.availCache[day] === entry) delete S.availCache[day];
+      throw err;
+    });
+    S.availCache[day] = entry;
+    return entry.p;
   }
 
   /** 這個起始時間能不能選：'ok' | 'past'（已過） | 'full'（跟別人的預約/關閉時段重疊） */
@@ -405,28 +455,33 @@
     return true;
   }
 
-  /** 進下一步前，再向後端確認一次這個時段還沒被別人搶走 */
-  function confirmSlot() {
-    var btn = $('btnNext');
-    btn.disabled = true;
-    btn.textContent = '確認時段中…';
-    return Api.call('checkAvailability', { serviceDay: S.day }).then(function (data) {
+  /**
+   * 進到下一步之後，在背景再確認一次這個時段沒被別人搶走（客人不用停下來等）。
+   * 真正送出時後端還會再擋一次（createOrder 內部的衝突檢查才是最終依據）。
+   */
+  function recheckSlotInBackground() {
+    var day = S.day, slot = S.slot;
+    getAvail(day, true).then(function (data) {
+      if (S.day !== day || S.slot !== slot || S.order) return;      // 客人已經改選或已送出
       S.avail = data;
-      if (slotState(S.slot) !== 'ok') {
+      if (slotState(slot) !== 'ok') {
         S.slot = null;
+        go(3, 'replace');
         renderSlots();
-        showError('這個時段剛剛已被預約或已過，請重新選擇其他時段。');
-        return false;
+        showError('這個時段剛剛已被別人預約或已過，請重新選擇其他時段。');
       }
-      return true;
-    }).catch(function (err) {
-      showError(err.message);
-      return false;
-    }).then(function (ok) {
-      btn.disabled = false;
-      btn.textContent = LABELS[3];
-      return ok;
-    });
+    }).catch(function () { /* 背景檢查失敗就算了，送出時後端會再確認 */ });
+  }
+
+  /** 預先檢查「這支電話是不是已經有進行中的預約」，送出時就不用再多等一輪 */
+  function prefetchDup() {
+    var phone = $('fPhone').value.replace(/\D/g, '');
+    if (phone.length < 8) return;
+    if (S.dup && S.dup.phone === phone) return;
+    var entry = { phone: phone };
+    entry.p = Api.call('checkPhoneActive', { phone: phone });
+    entry.p.catch(function () { if (S.dup === entry) S.dup = null; });
+    S.dup = entry;
   }
 
   /* ---------------- Step 4：付款 ---------------- */
@@ -497,7 +552,8 @@
   function setBusy(on) {
     $('btnNext').disabled = on;
     $('btnBack').disabled = on;
-    $('btnNext').textContent = on ? '送出中…' : LABELS[5];
+    $('btnNext').textContent = on ? '送出中…請稍候' : LABELS[5];
+    $('submitHint').hidden = !on;
   }
 
   function submit() {
@@ -513,7 +569,9 @@
     clearError();
     var data = payload();
 
-    Api.call('checkPhoneActive', { phone: data.phone }).then(function (res) {
+    prefetchDup();
+    var dupP = (S.dup && S.dup.phone === data.phone) ? S.dup.p : Api.call('checkPhoneActive', { phone: data.phone });
+    dupP.catch(function () { return Api.call('checkPhoneActive', { phone: data.phone }); }).then(function (res) {
       if (res.hasActive) {
         $('dupText').textContent = '電話 ' + data.phone + ' 目前已有 ' + res.orders.length + ' 筆進行中的預約，確定還要再預約一筆嗎？';
         $('dupModal').hidden = false;
@@ -556,6 +614,8 @@
 
     try { sessionStorage.removeItem(DRAFT_KEY); } catch (e) { /* ignore */ }
     history.replaceState({ done: true }, '', location.pathname + location.search);
+    Api.fire('processNotify', {});                 // 通知信 / 日曆在背景處理，客人不用等
+    bindCalendarButtons(o);
     $('doneOrderNo').textContent = o.orderNo;
     $('lineLink').href = CFG.LINE_OA_URL;
 
@@ -590,13 +650,19 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  /** 客人自己選要不要加到自己的行事曆（純前端，不寄任何邀請信） */
+  function bindCalendarButtons(o) {
+    $('calGoogle').href = U.googleCalUrl(o);
+    $('calIcs').onclick = function () { U.downloadIcs(o); };
+  }
+
   /* ---------------- 事件綁定 ---------------- */
 
   $('btnNext').addEventListener('click', function () {
     var n = S.step;
-    if (n === 1 && validateStep1()) go(2);
+    if (n === 1 && validateStep1()) { go(2); prefetchDup(); }
     else if (n === 2 && validateStep2()) go(3);
-    else if (n === 3 && validateStep3()) confirmSlot().then(function (ok) { if (ok) go(4); });
+    else if (n === 3 && validateStep3()) { go(4); recheckSlotInBackground(); }
     else if (n === 4 && validateStep4()) go(5);
     else if (n === 5) submit();
   });
@@ -697,6 +763,9 @@
   restoreDraft();
   renderDates();
   go(1, 'init');
+  // 預先載入今天的空檔，接著再悄悄載入明天的（最常被選到），到第 3 步就不用等
+  getAvail(U.serviceToday()).then(function () { return getAvail(U.addDays(U.serviceToday(), 1)); })
+    .catch(function () { /* 預先載入失敗不要緊，到第 3 步會再載一次 */ });
   loadVehicles().then(function () {
     if (!S.draftVehicle || !S.loaded) return;
     var ok = [].some.call($('fVehicle').options, function (o) { return o.value === S.draftVehicle; });

@@ -114,6 +114,74 @@
     document.documentElement.classList.toggle('no-scroll', !!on);
   }
 
+  /* ---------- 加入行事曆：純前端，由客人自己決定要不要加，完全不會寄任何邀請信 ---------- */
+
+  function calLocalStamp(str) {                 // 台北時間 'yyyy-MM-dd HH:mm:ss' → 20260927T210000
+    var m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(String(str || ''));
+    return m ? m[1] + m[2] + m[3] + 'T' + m[4] + m[5] + '00' : '';
+  }
+
+  function calUtcStamp(str) {                   // 台北時間 → UTC 20260927T130000Z（.ics 用 UTC 最不會被各家日曆誤判時區）
+    var d = new Date(wallMs(str) - 8 * 3600000);
+    return d.getUTCFullYear() + pad2(d.getUTCMonth() + 1) + pad2(d.getUTCDate()) + 'T' +
+      pad2(d.getUTCHours()) + pad2(d.getUTCMinutes()) + pad2(d.getUTCSeconds()) + 'Z';
+  }
+
+  function calText(o) {
+    var vehicle = ((o.vehicleBrand || '') + ' ' + (o.vehicleModel || '')).trim();
+    return {
+      title: '沐車所｜代客牽車洗車',
+      location: String(o.pickupAddress || ''),
+      details: ['訂單編號：' + o.orderNo, vehicle ? '車種：' + vehicle : '', '牽車地址：' + (o.pickupAddress || ''),
+        '專員姓名與聯絡資訊，店家會透過官方 LINE 通知您。', '如需變更或取消，請至網站「查詢 / 取消預約」。']
+        .filter(Boolean).join('\n')
+    };
+  }
+
+  function googleCalUrl(o) {
+    var t = calText(o);
+    return 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+      '&text=' + encodeURIComponent(t.title) +
+      '&dates=' + calLocalStamp(o.startAt) + '/' + calLocalStamp(o.endAt) +
+      '&ctz=Asia%2FTaipei' +
+      '&location=' + encodeURIComponent(t.location) +
+      '&details=' + encodeURIComponent(t.details);
+  }
+
+  function icsEscape(s) {
+    return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  }
+
+  function icsText(o) {
+    var t = calText(o);
+    return [
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//MUCAR//Booking//ZH', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      'UID:' + o.orderNo + '@mucar-booking',
+      'DTSTAMP:' + calUtcStamp(nowStr()),
+      'DTSTART:' + calUtcStamp(o.startAt),
+      'DTEND:' + calUtcStamp(o.endAt),
+      'SUMMARY:' + icsEscape(t.title),
+      'LOCATION:' + icsEscape(t.location),
+      'DESCRIPTION:' + icsEscape(t.details),
+      'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + icsEscape(t.title), 'TRIGGER:-PT60M', 'END:VALARM',
+      'END:VEVENT', 'END:VCALENDAR'
+    ].join('\r\n');
+  }
+
+  /** 下載 .ics（iPhone / Mac / Outlook 等；點開會跳出「加入行事曆」） */
+  function downloadIcs(o) {
+    var blob = new Blob([icsText(o)], { type: 'text/calendar;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'mucar-' + o.orderNo + '.ics';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+
   var toastTimer = null;
   function toast(msg, type) {
     var t = document.getElementById('toast');
@@ -132,6 +200,7 @@
   global.U = {
     esc: esc, pad2: pad2, taipeiNow: taipeiNow, nowStr: nowStr, wallMs: wallMs, msToStr: msToStr, hm: hm,
     addDays: addDays, serviceToday: serviceToday, dayLabel: dayLabel, weekday: weekday, money: money,
-    isTrue: isTrue, mapUrl: mapUrl, orderState: orderState, copyText: copyText, toast: toast, lockScroll: lockScroll
+    isTrue: isTrue, mapUrl: mapUrl, orderState: orderState, copyText: copyText, toast: toast, lockScroll: lockScroll,
+    googleCalUrl: googleCalUrl, icsText: icsText, downloadIcs: downloadIcs
   };
 })(window);
