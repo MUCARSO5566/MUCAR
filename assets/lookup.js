@@ -33,6 +33,7 @@
       row('姓名', U.esc(o.customerName)) +
       row('預約時段', U.esc(o.startAt.slice(0, 16)) + ' ～ ' + U.esc(o.endAt.slice(11, 16))) +
       row('車種', U.esc(o.vehicleBrand + ' ' + o.vehicleModel)) +
+      (o.addonNames ? row('加購項目', U.esc(o.addonNames) + '（+' + U.esc(U.money(o.addonTotal)) + '）') : '') +
       row('洗車費用', U.esc(priceText)) +
       row('牽車地址', U.esc(o.pickupAddress || '—')) +
       row('付款方式', o.paymentMethod === 'transfer' ? '匯款' : '現場付款') +

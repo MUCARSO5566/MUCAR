@@ -8,7 +8,7 @@
 <title>店家後台｜沐車所 MUCAR</title>
 <link rel="preconnect" href="https://script.google.com" crossorigin>
 <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
-<link rel="stylesheet" href="assets/style.css?v=7">
+<link rel="stylesheet" href="assets/style.css?v=8">
 </head>
 <body>
 
@@ -158,6 +158,24 @@
     </div>
 
     <div class="card">
+      <h2>加購項目</h2>
+      <p class="hint" style="margin-bottom:10px">客人選好車種後，預約頁下方會出現這些選項讓客人自己勾選加購；不管什麼車型都是同一份清單、同樣的加價。</p>
+      <div class="table-scroll">
+        <table class="data cardify t-tier" id="addonTable" style="min-width:380px">
+          <thead><tr><th>名稱</th><th>加價</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <h3 style="margin-top:18px">新增加購項目</h3>
+      <div class="inline-form">
+        <div class="field"><label for="newAddonName">名稱</label><input id="newAddonName" type="text" maxlength="20" placeholder="例如：鍍膜"></div>
+        <div class="field"><label for="newAddonPrice">加價</label><input id="newAddonPrice" type="number" min="0" step="10"></div>
+        <button class="btn btn-secondary btn-sm" id="addonAdd" type="button">新增項目</button>
+      </div>
+      <div id="addonAddError" class="alert alert-danger" style="margin-top:10px" hidden></div>
+    </div>
+
+    <div class="card">
       <h2>廠牌 / 車型對照</h2>
       <div class="inline-form" style="margin:12px 0 4px">
         <div class="field"><label for="newBrand">廠牌</label><input id="newBrand" type="text" maxlength="40"></div>
@@ -230,10 +248,15 @@
         <li>時間：預約時段；地點：牽車地址（點開可導航）</li>
         <li>提醒：前一天 20:00 寄信提醒、開始前 1 小時跳通知</li>
         <li>後台核對、改金額、加備註時行程會同步更新；預約取消時行程自動刪除</li>
-        <li>上面的收件信箱會被加為行程參與者（不會寄邀請信），所以主要信箱的日曆也看得到</li>
+        <li>每封「新預約」通知信最下面也有「加入 Google 日曆」連結＋.ics 附件，不在下面名單裡的人也能自己點一下加入</li>
       </ul>
-      <div class="alert alert-warn" style="margin-top:16px">
-        每封「新預約」通知信最下面都有「<b>加入 Google 日曆</b>」連結，老闆、專員自己點一下就能把那筆預約加進<b>自己的</b>日曆（也附上 .ics 檔給 Apple / Outlook 用）。這只是連結，不會自動幫任何人加入、也不會寄出「邀請」信——如果你之前收過看起來像會議邀請、寫著「使用 Google Meet 加入」的信，那是舊版系統自動把大家加成 Google 日曆「參與者」造成的，這一版已經拿掉，不會再發生。
+      <div class="field" style="margin-top:16px">
+        <label for="ntCalGuests">日曆共享對象（選填，一行一個 Gmail，最多 10 位）</label>
+        <textarea id="ntCalGuests" rows="3" placeholder="boss@gmail.com&#10;driver1@gmail.com" style="min-height:84px" autocapitalize="none" spellcheck="false"></textarea>
+        <div class="hint" id="ntGuestHint">每筆<b>新預約</b>都會自動出現在他們的 Google 日曆裡，適合老闆與日後負責牽車的專員。沒填過時沿用「Email 收件信箱」。</div>
+        <div class="alert alert-warn" style="margin-top:10px">
+          Google 會寄一封「邀請」信給名單裡的人（可能帶 Google Meet 連結、看起來像會議邀請）。程式已經要求「不要寄」，但 Google 不一定會理會——每個人想關掉這封信，要自己到 <b>Google 日曆網頁版 → 齒輪設定 → 左側自己的日曆 →「其他通知」</b>，把「新事件的電子郵件」關掉即可；事件通常還是會照常出現在他們的日曆上，只是不會再收到通知信。這是 Google 帳號各自的設定，我們這邊沒辦法幫忙關。
+        </div>
       </div>
       <details class="range" style="margin-top:4px">
         <summary>怎麼讓某個人看到「整個日曆」（包含以前建立的）？</summary>
@@ -318,9 +341,9 @@
   </div>
 </div>
 
-<script src="assets/config.js?v=7"></script>
-<script src="assets/util.js?v=7"></script>
-<script src="assets/api.js?v=7"></script>
-<script src="assets/admin.js?v=7"></script>
+<script src="assets/config.js?v=8"></script>
+<script src="assets/util.js?v=8"></script>
+<script src="assets/api.js?v=8"></script>
+<script src="assets/admin.js?v=8"></script>
 </body>
 </html>

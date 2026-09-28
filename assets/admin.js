@@ -7,8 +7,8 @@
   function safeGet() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
   function safeSet(v) { try { v ? localStorage.setItem(KEY_STORE, v) : localStorage.removeItem(KEY_STORE); } catch (e) { /* 無痕模式等 */ } }
 
-  var REQUIRED_BACKEND = 10;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
-  var S = { calMode: 'auto', orders: [], tiers: [], types: [], customers: [], open: null, closures: [] };
+  var REQUIRED_BACKEND = 11;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
+  var S = { calMode: 'auto', orders: [], tiers: [], types: [], addons: [], customers: [], open: null, closures: [] };
 
   /* ---------------- 呼叫後端（密碼失效時自動回登入畫面） ---------------- */
 
@@ -229,6 +229,7 @@
       kv('客人', U.esc(o.customerName) + '　<a href="tel:' + U.esc(tel) + '">' + U.esc(tel) + '</a>') +
       kv('LINE / 生日', U.esc(o.lineId || '—') + '　/　' + U.esc(o.birthday || '—')) +
       kv('車型', U.esc(vehLabel(o)) + '<br><span class="hint">' + U.esc(o.tierName || '') + '</span>') +
+      (o.addonNames ? kv('加購項目', U.esc(o.addonNames) + '（+' + U.money(o.addonTotal) + '）') : '') +
       kv('牽車地址', U.esc(o.pickupAddress || '—') + (o.pickupAddress ? '　<a href="' + U.esc(U.mapUrl(o.pickupAddress)) + '" target="_blank" rel="noopener">開啟地圖</a>' : '')) +
       kv('預約時段', U.esc(o.startAt.slice(0, 16)) + ' ～ ' + U.esc(o.endAt.slice(11, 16))) +
       kv('付款方式', o.paymentMethod === 'transfer'
@@ -378,10 +379,12 @@
    * ============================================================ */
 
   function loadVehicles() {
-    return Promise.all([call('listRows', { sheet: 'VehicleTier' }), call('listRows', { sheet: 'VehicleType' })]).then(function (r) {
+    return Promise.all([call('listRows', { sheet: 'VehicleTier' }), call('listRows', { sheet: 'VehicleType' }), call('listRows', { sheet: 'AddOn' })]).then(function (r) {
       S.tiers = r[0].sort(function (a, b) { return Number(a.sort) - Number(b.sort); });
       S.types = r[1];
+      S.addons = r[2].sort(function (a, b) { return Number(a.sort) - Number(b.sort); });
       renderTiers();
+      renderAddons();
       $('newTier').innerHTML = S.tiers.map(function (t) { return '<option value="' + U.esc(t.id) + '">' + U.esc(t.name) + '</option>'; }).join('');
       renderVehicles();
     }).catch(fail);
@@ -424,6 +427,48 @@
     call('saveVehicleTier', { row: { name: name, price: Number(price), sort: maxSort + 1, active: true } })
       .then(function () {
         $('newTierName').value = ''; $('newTierPrice').value = '';
+        U.toast('已新增「' + name + '」');
+        return loadVehicles();
+      }).catch(function (e2) { err.textContent = e2.message; err.hidden = false; });
+  });
+
+  function renderAddons() {
+    $('addonTable').querySelector('tbody').innerHTML = S.addons.map(function (a) {
+      return '<tr><td><input type="text" maxlength="20" class="tier-name-in" data-name="' + U.esc(a.id) + '" value="' + U.esc(a.name) + '"></td>' +
+        '<td><input class="money-in" type="number" min="0" step="10" data-price="' + U.esc(a.id) + '" value="' + U.esc(a.price) + '"></td>' +
+        '<td><button class="btn btn-secondary btn-sm" data-save-addon="' + U.esc(a.id) + '" type="button">儲存</button> ' +
+        '<button class="btn btn-ghost btn-sm" data-del-addon="' + U.esc(a.id) + '" type="button">刪除</button></td></tr>';
+    }).join('');
+  }
+
+  $('addonTable').addEventListener('click', function (e) {
+    var saveId = e.target.dataset.saveAddon, delId = e.target.dataset.delAddon;
+    if (saveId) {
+      var nameInput = $('addonTable').querySelector('input[data-name="' + saveId + '"]');
+      var priceInput = $('addonTable').querySelector('input[data-price="' + saveId + '"]');
+      var a = S.addons.filter(function (x) { return x.id === saveId; })[0];
+      var name = nameInput.value.trim();
+      if (!name) return U.toast('請輸入名稱', 'error');
+      if (priceInput.value === '' || isNaN(Number(priceInput.value)) || Number(priceInput.value) < 0) return U.toast('價格格式錯誤', 'error');
+      call('saveAddOn', { row: { id: saveId, name: name, price: Number(priceInput.value), sort: a.sort, active: true } })
+        .then(function () { U.toast(name + ' 已更新'); return loadVehicles(); }).catch(fail);
+    } else if (delId) {
+      if (!confirm('確定刪除這個加購項目嗎？已經送出的舊訂單不受影響，只是預約頁以後不會再顯示這個選項。')) return;
+      call('deleteRow', { sheet: 'AddOn', id: delId }).then(function () { U.toast('已刪除'); return loadVehicles(); }).catch(fail);
+    }
+  });
+
+  $('addonAdd').addEventListener('click', function () {
+    var err = $('addonAddError');
+    err.hidden = true;
+    var name = $('newAddonName').value.trim();
+    var price = $('newAddonPrice').value;
+    if (!name) { err.textContent = '請輸入名稱'; err.hidden = false; return; }
+    if (price === '' || isNaN(Number(price)) || Number(price) < 0) { err.textContent = '請輸入正確的價格'; err.hidden = false; return; }
+    var maxSort = S.addons.reduce(function (m, a) { return Math.max(m, Number(a.sort) || 0); }, 0);
+    call('saveAddOn', { row: { name: name, price: Number(price), sort: maxSort + 1, active: true } })
+      .then(function () {
+        $('newAddonName').value = ''; $('newAddonPrice').value = '';
         U.toast('已新增「' + name + '」');
         return loadVehicles();
       }).catch(function (e2) { err.textContent = e2.message; err.hidden = false; });
@@ -547,9 +592,14 @@
     $('ntQuota').textContent = st.quota == null ? '—' : st.quota + ' 封';
     $('ntCalName').textContent = st.calendarName || '沐車所預約';
     $('ntCalId').value = st.calendarId || '';
+    $('ntCalGuests').value = (st.calendarGuests || []).join('\n');
+    $('ntGuestHint').innerHTML = (st.calendarGuestsCustom
+      ? '目前使用你自訂的名單。'
+      : '目前還沒自訂，暫時沿用上面的「Email 收件信箱」。') +
+      ' 每筆<b>新預約</b>都會自動出現在他們的 Google 日曆裡，適合老闆與日後負責牽車的專員；已經建立的舊行程不會改變。';
     $('ntCalWhere').textContent = '日曆「' + (st.calendarName || '沐車所預約') + '」' +
       (st.calendarId ? '（你指定的日曆）' : '（系統自動建立）') + '，在 ' + (st.sender || '部署 Apps Script 的 Google 帳號') +
-      ' 的 Google 日曆裡（電腦版左側「我的日曆」）。老闆／專員要看到新預約，用通知信最下面的「加入 Google 日曆」連結自己加入即可。';
+      ' 的 Google 日曆裡（電腦版左側「我的日曆」）';
     $('ntQueue').textContent = '待處理 ' + (st.pending || 0) + ' 筆；每分鐘備援排程' + (st.triggerOn ? '已啟用' : '尚未啟用（在 Apps Script 執行一次 authorizeNotifications 即可啟用）');
     if (st.pending > 0) Api.fire('processNotify', {});
     $('ntCalState').textContent = st.calendarReady ? '已建立，運作中' : '尚未建立（收到第一筆預約或按「測試日曆連線」時會自動建立）';
@@ -577,7 +627,8 @@
       emails: $('ntEmails').value,
       notifyEnabled: $('ntMailOn').checked,
       calendarMode: (document.querySelector('input[name="calMode"]:checked') || {}).value || 'auto',
-      calendarId: $('ntCalId').value.trim()
+      calendarId: $('ntCalId').value.trim(),
+      calendarGuests: $('ntCalGuests').value
     }).then(function (st) { showNotify(st); U.toast('通知設定已儲存'); if (S.open) refreshOpen(); })
       .catch(function (err) { $('ntError').textContent = err.message; $('ntError').hidden = false; })
       .then(function () { $('ntSave').disabled = false; });

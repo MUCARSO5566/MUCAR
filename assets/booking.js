@@ -16,6 +16,7 @@
     otherTier: '',          // 「找不到我的車」時客人自選的車型級距 id（空 = 由店家判斷）
     day: '', slot: null, avail: null, availSeq: 0,
     payment: '', order: null, mapActive: false, draftVehicle: '',
+    addons: [], selectedAddons: [],
     availCache: {},         // day -> { t: 取得時間, p: Promise }；預先載入 / 短時間內重複點日期不用再等
     dup: null               // { phone, p }；預先做好的「重複預約」檢查
   };
@@ -75,6 +76,25 @@
     return U.money(p.price) + (p.tentative ? '（暫估，店家確認車款後為準）' : '');
   }
 
+  function addonTotal() {
+    return S.selectedAddons.reduce(function (sum, id) {
+      var a = S.addons.filter(function (x) { return x.id === id; })[0];
+      return sum + (a ? Number(a.price) : 0);
+    }, 0);
+  }
+  function selectedAddonNames() {
+    return S.selectedAddons.map(function (id) {
+      var a = S.addons.filter(function (x) { return x.id === id; })[0];
+      return a ? a.name : '';
+    }).filter(Boolean);
+  }
+  /** 洗車費用＋加購合計的顯示文字 */
+  function totalLabel() {
+    var p = priceInfo();
+    if (p.price == null) return '待店家確認';
+    return U.money(p.price + addonTotal()) + (p.tentative ? '（暫估，店家確認車款後為準）' : '');
+  }
+
   function windowHours() { return S.avail ? Number(S.avail.windowHours) : 3; }
 
   function slotRange(ms) {
@@ -129,7 +149,8 @@
     var chips = [];
     if (S.step >= 3 && S.vehicle) {
       var p = priceInfo();
-      chips.push('<span class="chip"><b>' + U.esc(vehicleText()) + '</b> · ' + (p.price != null ? U.money(p.price) + (p.tentative ? '（暫估）' : '') : '待確認') + '</span>');
+      var chipTotal = p.price != null ? p.price + addonTotal() : null;
+      chips.push('<span class="chip"><b>' + U.esc(vehicleText()) + '</b> · ' + (chipTotal != null ? U.money(chipTotal) + (p.tentative ? '（暫估）' : '') : '待確認') + '</span>');
     }
     if (S.step >= 4 && S.slot) chips.push('<span class="chip"><b>' + U.esc(slotText()) + '</b></span>');
     var box = $('summary');
@@ -199,6 +220,8 @@
 
   /** 套用車型資料；有內容回傳 true。資料沒變就不重畫，避免客人正在選的時候選單被重整 */
   function applyBoot(data) {
+    S.addons = data.addons || [];
+    renderAddons();
     var tiers = data.tiers || [];
     var types = (data.vehicleTypes || []);
     var sig = JSON.stringify([tiers, types]);
@@ -210,6 +233,15 @@
     S.loaded = true;
     renderVehicles();
     return true;
+  }
+
+  /** 加購項目（例如藥水）：不管選哪種車都是同一份清單 */
+  function renderAddons() {
+    if (!S.addons.length) { $('addonBox').hidden = true; return; }
+    $('addonList').innerHTML = S.addons.map(function (a) {
+      var checked = S.selectedAddons.indexOf(a.id) >= 0;
+      return '<label class="' + (checked ? 'selected' : '') + '"><input type="checkbox" value="' + U.esc(a.id) + '"' + (checked ? ' checked' : '') + '><div><b>' + U.esc(a.name) + '</b><span>+' + U.money(a.price) + '</span></div></label>';
+    }).join('');
   }
 
   function renderVehicles() {
@@ -292,10 +324,13 @@
   }
 
   function showPreview() {
-    if (!S.vehicle || (isOther() && !$('fTier').value)) { $('pricePreview').hidden = true; return; }
+    var ready = !!S.vehicle && !(isOther() && !$('fTier').value);
+    $('addonBox').hidden = !ready || !S.addons.length;
+    if (!ready) { $('pricePreview').hidden = true; return; }
     var p = priceInfo();
+    var total = p.price != null ? p.price + addonTotal() : null;
     $('ppTier').textContent = p.tier ? '車型：' + p.tier : '';
-    $('ppPrice').textContent = p.price != null ? U.money(p.price) + (p.tentative ? '（暫估）' : '') : '待店家確認';
+    $('ppPrice').textContent = total != null ? U.money(total) + (p.tentative ? '（暫估）' : '') : '待店家確認';
     $('pricePreview').hidden = false;
   }
 
@@ -514,12 +549,15 @@
 
   function renderReview() {
     var p = priceInfo();
+    var names = selectedAddonNames();
     var html =
       row('姓名', U.esc($('fName').value.trim())) +
       row('電話', U.esc($('fPhone').value.replace(/\D/g, ''))) +
       row('車種', U.esc(vehicleText())) +
-      row('車型', U.esc(p.tier || '—')) +
-      row('洗車費用', U.esc(priceLabel(p))) +
+      row('車型', U.esc(p.tier || '—'));
+    if (names.length) html += row('加購項目', U.esc(names.join('、')) + '（+' + U.esc(U.money(addonTotal())) + '）');
+    html +=
+      row('洗車費用', U.esc(totalLabel())) +
       row('牽車地址', U.esc($('fAddress').value.trim()).replace(/\n/g, '<br>')) +
       row('預約時段', U.esc(slotText())) +
       row('付款方式', S.payment === 'transfer'
@@ -543,6 +581,7 @@
       vehicleTypeId: isOther() ? 'OTHER' : S.vehicle.id,
       otherVehicle: isOther() ? $('fOther').value.trim() : '',
       otherTierId: isOther() ? S.otherTier : '',
+      addonIds: S.selectedAddons,
       serviceDay: S.day,
       startTime: U.hm(S.slot),
       paymentMethod: S.payment
@@ -626,6 +665,7 @@
     $('doneTable').innerHTML =
       row('預約時段', U.esc(o.startAt.slice(5, 16)) + ' ～ ' + U.esc(o.endAt.slice(5, 16))) +
       row('車種', U.esc(o.vehicleBrand + ' ' + o.vehicleModel)) +
+      (o.addonNames ? row('加購項目', U.esc(o.addonNames) + '（+' + U.esc(U.money(o.addonTotal)) + '）') : '') +
       row('洗車費用', U.esc(priceText)) +
       row('牽車地址', U.esc(o.pickupAddress)) +
       row('付款方式', o.paymentMethod === 'transfer' ? '匯款' : '現場付款');
@@ -693,7 +733,8 @@
     try {
       sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
         name: $('fName').value, phone: $('fPhone').value, birthday: $('fBirthday').value, line: $('fLine').value,
-        note: $('fNote').value, address: $('fAddress').value, other: $('fOther').value, vehicle: $('fVehicle').value
+        note: $('fNote').value, address: $('fAddress').value, other: $('fOther').value, vehicle: $('fVehicle').value,
+        addons: S.selectedAddons
       }));
     } catch (e) { /* 無痕模式等 */ }
   }
@@ -704,6 +745,7 @@
       $('fName').value = d.name || ''; $('fPhone').value = d.phone || ''; $('fBirthday').value = d.birthday || '';
       $('fLine').value = d.line || ''; $('fNote').value = d.note || ''; $('fAddress').value = d.address || ''; $('fOther').value = d.other || '';
       S.draftVehicle = d.vehicle || '';
+      S.selectedAddons = Array.isArray(d.addons) ? d.addons : [];
     } catch (e) { /* ignore */ }
   }
   ['fName', 'fPhone', 'fBirthday', 'fLine', 'fNote', 'fAddress', 'fOther'].forEach(function (id) {
@@ -711,6 +753,15 @@
     $(id).addEventListener('change', saveDraft);
   });
   $('fVehicle').addEventListener('change', saveDraft);
+  $('addonList').addEventListener('change', function (e) {
+    if (e.target.type !== 'checkbox') return;
+    var id = e.target.value, idx = S.selectedAddons.indexOf(id);
+    if (e.target.checked && idx < 0) S.selectedAddons.push(id);
+    else if (!e.target.checked && idx >= 0) S.selectedAddons.splice(idx, 1);
+    e.target.closest('label').classList.toggle('selected', e.target.checked);
+    showPreview();
+    saveDraft();
+  });
 
   $('fAddress').addEventListener('input', function () {
     clearTimeout(mapTimer);
