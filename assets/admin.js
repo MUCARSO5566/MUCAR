@@ -7,7 +7,7 @@
   function safeGet() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
   function safeSet(v) { try { v ? localStorage.setItem(KEY_STORE, v) : localStorage.removeItem(KEY_STORE); } catch (e) { /* 無痕模式等 */ } }
 
-  var REQUIRED_BACKEND = 9;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
+  var REQUIRED_BACKEND = 10;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
   var S = { calMode: 'auto', orders: [], tiers: [], types: [], customers: [], open: null, closures: [] };
 
   /* ---------------- 呼叫後端（密碼失效時自動回登入畫面） ---------------- */
@@ -389,20 +389,44 @@
 
   function renderTiers() {
     $('tierTable').querySelector('tbody').innerHTML = S.tiers.map(function (t) {
-      return '<tr><td><b>' + U.esc(t.name) + '</b></td>' +
+      return '<tr><td><input type="text" maxlength="20" class="tier-name-in" data-name="' + U.esc(t.id) + '" value="' + U.esc(t.name) + '"></td>' +
         '<td><input class="money-in" type="number" min="0" step="10" data-price="' + U.esc(t.id) + '" value="' + U.esc(t.price) + '"></td>' +
-        '<td><button class="btn btn-secondary btn-sm" data-save-tier="' + U.esc(t.id) + '" type="button">儲存</button></td></tr>';
+        '<td><button class="btn btn-secondary btn-sm" data-save-tier="' + U.esc(t.id) + '" type="button">儲存</button> ' +
+        '<button class="btn btn-ghost btn-sm" data-del-tier="' + U.esc(t.id) + '" type="button">刪除</button></td></tr>';
     }).join('');
   }
 
   $('tierTable').addEventListener('click', function (e) {
-    var id = e.target.dataset.saveTier;
-    if (!id) return;
-    var input = $('tierTable').querySelector('input[data-price="' + id + '"]');
-    var t = S.tiers.filter(function (x) { return x.id === id; })[0];
-    if (input.value === '' || isNaN(Number(input.value)) || Number(input.value) < 0) return U.toast('價格格式錯誤', 'error');
-    call('saveVehicleTier', { row: { id: id, name: t.name, price: Number(input.value), sort: t.sort, active: true } })
-      .then(function () { U.toast(t.name + ' 價格已更新'); return loadVehicles(); }).catch(fail);
+    var saveId = e.target.dataset.saveTier, delId = e.target.dataset.delTier;
+    if (saveId) {
+      var nameInput = $('tierTable').querySelector('input[data-name="' + saveId + '"]');
+      var priceInput = $('tierTable').querySelector('input[data-price="' + saveId + '"]');
+      var t = S.tiers.filter(function (x) { return x.id === saveId; })[0];
+      var name = nameInput.value.trim();
+      if (!name) return U.toast('請輸入級距名稱', 'error');
+      if (priceInput.value === '' || isNaN(Number(priceInput.value)) || Number(priceInput.value) < 0) return U.toast('價格格式錯誤', 'error');
+      call('saveVehicleTier', { row: { id: saveId, name: name, price: Number(priceInput.value), sort: t.sort, active: true } })
+        .then(function () { U.toast(name + ' 已更新'); return loadVehicles(); }).catch(fail);
+    } else if (delId) {
+      if (!confirm('確定刪除這個級距嗎？目前指定這個級距的車型會變成沒有對應級距，建議先把它們改到別的級距，或直接把這個級距的名稱／價格改掉，不一定要刪除。')) return;
+      call('deleteRow', { sheet: 'VehicleTier', id: delId }).then(function () { U.toast('已刪除'); return loadVehicles(); }).catch(fail);
+    }
+  });
+
+  $('tierAdd').addEventListener('click', function () {
+    var err = $('tierAddError');
+    err.hidden = true;
+    var name = $('newTierName').value.trim();
+    var price = $('newTierPrice').value;
+    if (!name) { err.textContent = '請輸入級距名稱'; err.hidden = false; return; }
+    if (price === '' || isNaN(Number(price)) || Number(price) < 0) { err.textContent = '請輸入正確的價格'; err.hidden = false; return; }
+    var maxSort = S.tiers.reduce(function (m, t) { return Math.max(m, Number(t.sort) || 0); }, 0);
+    call('saveVehicleTier', { row: { name: name, price: Number(price), sort: maxSort + 1, active: true } })
+      .then(function () {
+        $('newTierName').value = ''; $('newTierPrice').value = '';
+        U.toast('已新增「' + name + '」');
+        return loadVehicles();
+      }).catch(function (e2) { err.textContent = e2.message; err.hidden = false; });
   });
 
   function renderVehicles() {
@@ -523,14 +547,9 @@
     $('ntQuota').textContent = st.quota == null ? '—' : st.quota + ' 封';
     $('ntCalName').textContent = st.calendarName || '沐車所預約';
     $('ntCalId').value = st.calendarId || '';
-    $('ntCalGuests').value = (st.calendarGuests || []).join('\n');
-    $('ntGuestHint').innerHTML = (st.calendarGuestsCustom
-      ? '目前使用你自訂的名單。'
-      : '目前還沒自訂，暫時沿用上面的「Email 收件信箱」。') +
-      ' 每筆<b>新預約</b>都會自動出現在他們的 Google 日曆裡（不會寄邀請信），適合老闆與日後負責牽車的專員；已經建立的舊行程不會改變。';
     $('ntCalWhere').textContent = '日曆「' + (st.calendarName || '沐車所預約') + '」' +
       (st.calendarId ? '（你指定的日曆）' : '（系統自動建立）') + '，在 ' + (st.sender || '部署 Apps Script 的 Google 帳號') +
-      ' 的 Google 日曆裡（電腦版左側「我的日曆」）';
+      ' 的 Google 日曆裡（電腦版左側「我的日曆」）。老闆／專員要看到新預約，用通知信最下面的「加入 Google 日曆」連結自己加入即可。';
     $('ntQueue').textContent = '待處理 ' + (st.pending || 0) + ' 筆；每分鐘備援排程' + (st.triggerOn ? '已啟用' : '尚未啟用（在 Apps Script 執行一次 authorizeNotifications 即可啟用）');
     if (st.pending > 0) Api.fire('processNotify', {});
     $('ntCalState').textContent = st.calendarReady ? '已建立，運作中' : '尚未建立（收到第一筆預約或按「測試日曆連線」時會自動建立）';
@@ -558,8 +577,7 @@
       emails: $('ntEmails').value,
       notifyEnabled: $('ntMailOn').checked,
       calendarMode: (document.querySelector('input[name="calMode"]:checked') || {}).value || 'auto',
-      calendarId: $('ntCalId').value.trim(),
-      calendarGuests: $('ntCalGuests').value
+      calendarId: $('ntCalId').value.trim()
     }).then(function (st) { showNotify(st); U.toast('通知設定已儲存'); if (S.open) refreshOpen(); })
       .catch(function (err) { $('ntError').textContent = err.message; $('ntError').hidden = false; })
       .then(function () { $('ntSave').disabled = false; });
