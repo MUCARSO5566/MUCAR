@@ -8,7 +8,7 @@
 <title>店家後台｜沐車所 MUCAR</title>
 <link rel="preconnect" href="https://script.google.com" crossorigin>
 <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
-<link rel="stylesheet" href="assets/style.css?v=8">
+<link rel="stylesheet" href="assets/style.css?v=9">
 </head>
 <body>
 
@@ -199,7 +199,21 @@
   <section id="tab-crm" class="tab-panel" hidden>
     <div class="card">
       <h2>客戶 CRM</h2>
-      <p class="hint" style="margin-bottom:10px">以電話辨識客人。每筆預約算一次消費，取消會扣回。點客人可看消費紀錄。</p>
+      <p class="hint" style="margin-bottom:10px">以電話辨識客人。每筆預約算一次消費，取消會扣回。點客人可看消費紀錄、編輯資料或刪除。</p>
+      <div class="filters">
+        <div class="presets" role="group" aria-label="快速選擇日期">
+          <button class="btn btn-secondary btn-sm" data-crm-preset="7d" type="button">7 天</button>
+          <button class="btn btn-secondary btn-sm" data-crm-preset="30d" type="button">30 天</button>
+          <button class="btn btn-secondary btn-sm" data-crm-preset="all" type="button">全部</button>
+        </div>
+        <details class="range">
+          <summary>自訂日期範圍<span class="hint" id="crmRange" style="margin:0"></span></summary>
+          <div class="row2">
+            <div class="field"><label for="crmFrom">起（最近預約）</label><input id="crmFrom" type="date"></div>
+            <div class="field"><label for="crmTo">迄</label><input id="crmTo" type="date"></div>
+          </div>
+        </details>
+      </div>
       <div class="field"><label for="crmSearch">搜尋</label><input id="crmSearch" type="text" placeholder="電話或姓名…"></div>
       <div class="stats" id="crmStats" style="margin-top:12px"></div>
       <div class="table-scroll">
@@ -341,9 +355,9 @@
   </div>
 </div>
 
-<script src="assets/config.js?v=8"></script>
-<script src="assets/util.js?v=8"></script>
-<script src="assets/api.js?v=8"></script>
-<script src="assets/admin.js?v=8"></script>
+<script src="assets/config.js?v=9"></script>
+<script src="assets/util.js?v=9"></script>
+<script src="assets/api.js?v=9"></script>
+<script src="assets/admin.js?v=9"></script>
 </body>
 </html>

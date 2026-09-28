@@ -7,8 +7,8 @@
   function safeGet() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (e) { return ''; } }
   function safeSet(v) { try { v ? localStorage.setItem(KEY_STORE, v) : localStorage.removeItem(KEY_STORE); } catch (e) { /* 無痕模式等 */ } }
 
-  var REQUIRED_BACKEND = 11;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
-  var S = { calMode: 'auto', orders: [], tiers: [], types: [], addons: [], customers: [], open: null, closures: [] };
+  var REQUIRED_BACKEND = 12;   // 這版網站需要的後端 Code.gs 版本（CODE_VER）
+  var S = { calMode: 'auto', orders: [], tiers: [], types: [], addons: [], customers: [], open: null, closures: [], historyCustomer: null };
 
   /* ---------------- 呼叫後端（密碼失效時自動回登入畫面） ---------------- */
 
@@ -96,7 +96,7 @@
     loadSettings();
     loadClosures();
     loadVehicles();
-    loadCustomers();
+    setCrmPreset('7d');
     loadNotify();
     var t = '';
     try { t = sessionStorage.getItem('mucar_admin_tab') || ''; } catch (e) { /* ignore */ }
@@ -528,8 +528,31 @@
    *  客戶 CRM
    * ============================================================ */
 
+  function markCrmPreset(p) {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-crm-preset]'), function (b) {
+      b.classList.toggle('active', b.dataset.crmPreset === p);
+    });
+  }
+
+  function setCrmPreset(p) {
+    markCrmPreset(p);
+    var t = U.serviceToday();
+    var from = '', to = '';
+    if (p === '7d') { from = U.addDays(t, -6); to = t; }
+    else if (p === '30d') { from = U.addDays(t, -29); to = t; }
+    $('crmFrom').value = from;
+    $('crmTo').value = to;
+    loadCustomers();
+  }
+
+  function showCrmRange() {
+    var f = $('crmFrom').value, t = $('crmTo').value;
+    $('crmRange').textContent = f || t ? '（' + (f || '…') + ' ～ ' + (t || '…') + '）' : '（全部日期）';
+  }
+
   function loadCustomers() {
-    return call('getCustomers', { q: $('crmSearch').value.trim() }).then(function (rows) {
+    showCrmRange();
+    return call('getCustomers', { q: $('crmSearch').value.trim(), from: $('crmFrom').value, to: $('crmTo').value }).then(function (rows) {
       S.customers = rows;
       var visits = rows.reduce(function (s, c) { return s + (Number(c.visitCount) || 0); }, 0);
       var spend = rows.reduce(function (s, c) { return s + (Number(c.totalSpend) || 0); }, 0);
@@ -546,6 +569,13 @@
   var crmTimer = null;
   $('crmSearch').addEventListener('input', function () { clearTimeout(crmTimer); crmTimer = setTimeout(loadCustomers, 250); });
 
+  Array.prototype.forEach.call(document.querySelectorAll('[data-crm-preset]'), function (b) {
+    b.addEventListener('click', function () { setCrmPreset(b.dataset.crmPreset); });
+  });
+  ['crmFrom', 'crmTo'].forEach(function (id) {
+    $(id).addEventListener('change', function () { markCrmPreset(''); loadCustomers(); });
+  });
+
   $('crmTable').addEventListener('click', function (e) {
     var tr = e.target.closest('tr[data-phone]');
     if (tr) loadHistory(tr.dataset.phone);
@@ -554,6 +584,7 @@
   function loadHistory(phone) {
     call('getCustomerHistory', { phone: phone }).then(function (d) {
       var c = d.customer || {};
+      S.historyCustomer = c;
       var rows = d.orders.map(function (o) {
         return '<tr class="click' + (o.status !== 'ACTIVE' ? ' off' : '') + '" data-open="' + U.esc(o.orderNo) + '"><td>' + U.esc(o.orderNo) + '</td><td>' + U.esc(o.serviceDay) + '</td><td>' +
           U.esc(vehLabel(o)) + '</td><td>' + (hasPrice(o) ? U.money(o.price) : '待報價') + '</td><td>' + stateTag(o) + '</td></tr>';
@@ -561,7 +592,24 @@
       $('crmHistory').innerHTML =
         '<div class="card" style="margin-top:16px"><h2>' + U.esc(c.name || phone) + ' 的消費紀錄</h2>' +
         '<p class="hint" style="margin:4px 0 12px">' + U.esc(phone) + '　生日 ' + U.esc(c.birthday || '—') + '　共 ' + (Number(c.visitCount) || 0) + ' 次・累計 ' + U.money(c.totalSpend || 0) + '</p>' +
-        '<div class="table-scroll"><table class="data cardify t-hist" style="min-width:520px"><thead><tr><th>訂單編號</th><th>營業日</th><th>車型</th><th>金額</th><th>狀態</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+        '<div class="table-scroll"><table class="data cardify t-hist" style="min-width:520px"><thead><tr><th>訂單編號</th><th>營業日</th><th>車型</th><th>金額</th><th>狀態</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        (c.id ? (
+          '<h3 style="margin-top:20px">編輯客人資料</h3>' +
+          '<div class="row2">' +
+          '<div class="field" style="margin-top:0"><label for="crmEditName">姓名</label><input id="crmEditName" type="text" maxlength="30" value="' + U.esc(c.name) + '"></div>' +
+          '<div class="field" style="margin-top:0"><label for="crmEditBirthday">生日</label><input id="crmEditBirthday" type="date" value="' + U.esc(c.birthday || '') + '"></div>' +
+          '</div>' +
+          '<div class="row2">' +
+          '<div class="field" style="margin-top:0"><label for="crmEditLine">LINE 帳號</label><input id="crmEditLine" type="text" maxlength="30" value="' + U.esc(c.lineId || '') + '"></div>' +
+          '<div class="field" style="margin-top:0"><label for="crmEditNote">備註</label><textarea id="crmEditNote" maxlength="200" style="min-height:40px">' + U.esc(c.note || '') + '</textarea></div>' +
+          '</div>' +
+          '<div class="btn-row" style="margin-top:14px">' +
+          '<button class="btn btn-primary btn-sm" id="crmEditSave" type="button">儲存</button>' +
+          '<button class="btn btn-danger btn-sm" id="crmEditDelete" type="button">刪除此客戶資料</button>' +
+          '</div>' +
+          '<div id="crmEditError" class="alert alert-danger" style="margin-top:10px" hidden></div>'
+        ) : '') +
+        '</div>';
       $('crmHistory').scrollIntoView({ behavior: 'smooth', block: 'start' });
       S.historyOrders = d.orders;
     }).catch(fail);
@@ -569,10 +617,41 @@
 
   $('crmHistory').addEventListener('click', function (e) {
     var tr = e.target.closest('tr[data-open]');
-    if (!tr) return;
-    var o = (S.historyOrders || []).filter(function (x) { return x.orderNo === tr.dataset.open; })[0];
-    if (o && !S.orders.some(function (x) { return x.orderNo === o.orderNo; })) S.orders.push(o);
-    openOrder(tr.dataset.open);
+    if (tr) {
+      var o = (S.historyOrders || []).filter(function (x) { return x.orderNo === tr.dataset.open; })[0];
+      if (o && !S.orders.some(function (x) { return x.orderNo === o.orderNo; })) S.orders.push(o);
+      openOrder(tr.dataset.open);
+      return;
+    }
+
+    if (e.target.id === 'crmEditSave') {
+      var c = S.historyCustomer;
+      var err = $('crmEditError');
+      err.hidden = true;
+      var name = $('crmEditName').value.trim();
+      if (!name) { err.textContent = '請輸入姓名'; err.hidden = false; return; }
+      var row = {
+        id: c.id, phone: c.phone, visitCount: c.visitCount, totalSpend: c.totalSpend,
+        firstOrderAt: c.firstOrderAt, lastOrderAt: c.lastOrderAt, createdAt: c.createdAt,
+        name: name, birthday: $('crmEditBirthday').value, lineId: $('crmEditLine').value.trim(), note: $('crmEditNote').value.trim()
+      };
+      call('saveCustomer', { row: row }).then(function () {
+        U.toast('已更新客人資料');
+        return loadCustomers().then(function () { return loadHistory(c.phone); });
+      }).catch(function (e2) { err.textContent = e2.message; err.hidden = false; });
+      return;
+    }
+
+    if (e.target.id === 'crmEditDelete') {
+      var c2 = S.historyCustomer;
+      if (!confirm('確定要刪除「' + c2.name + '」的客戶資料嗎？\n\n這只會移除 CRM 客戶清單與消費統計，不會刪除底下列出的訂單紀錄（要清掉測試訂單，請到「預約訂單」分頁個別取消）。刪除後無法復原。')) return;
+      call('deleteRow', { sheet: 'Customer', id: c2.id }).then(function () {
+        U.toast('已刪除客戶資料');
+        $('crmHistory').innerHTML = '';
+        S.historyCustomer = null;
+        return loadCustomers();
+      }).catch(fail);
+    }
   });
 
   /* ============================================================
